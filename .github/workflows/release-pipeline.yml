@@ -13,19 +13,19 @@ name: Create GitHub Draft Release
 jobs:
   
   unit-test-workflow:
-    uses: ./.github/workflows/azureml-unit-tests.yml
+    uses: ./.github/workflows/unit-tests.yml
     secrets: inherit
 
   cpu-nightly-workflow:
-    uses: ./.github/workflows/azureml-cpu-nightly.yml
+    uses: ./.github/workflows/cpu-nightly.yml
     secrets: inherit
 
   gpu-nightly-workflow:
-    uses: ./.github/workflows/azureml-gpu-nightly.yml
+    uses: ./.github/workflows/gpu-nightly.yml
     secrets: inherit
 
   spark-nightly-workflow:
-    uses: ./.github/workflows/azureml-spark-nightly.yml
+    uses: ./.github/workflows/spark-nightly.yml
     secrets: inherit
 
   create-release:
