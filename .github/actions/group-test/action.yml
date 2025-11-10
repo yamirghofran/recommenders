@@ -1,0 +1,31 @@
+# ---------------------------------------------------------
+# Copyright (c) Recommenders contributors.
+# Licensed under the MIT License.
+# ---------------------------------------------------------
+
+name: group-test
+description: Run grouped tests in a Docker container.
+inputs:
+  config-file:
+    required: true
+    description: Test group configuraiton file
+  dockerfile:
+    required: true
+    description: Path to the Dockerfile used for building the test
+      environment
+  group:
+    required: true
+    description: Test group name
+  type:
+    required: true
+    description: Type of test group - pr_gate or nightly
+    default: pr_gate
+
+runs:
+  using: docker
+  image: ${{ inputs.dockerfile }}
+  entrypoint: entrypoint.sh
+  args:
+    - ${{ inputs.group }}
+    - ${{ inputs.type }}
+    - ${{ inputs.config-file }}

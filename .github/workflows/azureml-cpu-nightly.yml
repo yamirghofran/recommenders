@@ -44,48 +44,9 @@ on:
   workflow_call:
 
 jobs:
-  get-test-groups:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - name: Get test group names
-        id: get_test_groups
-        uses: ./.github/actions/get-test-groups
-        with:
-          TEST_KIND: "nightly"
-          TEST_ENV: "cpu"
-      - name: Print test group names
-        run: echo ${{ steps.get_test_groups.outputs.test_groups }}
-        shell: bash
-    outputs:
-      test_groups: ${{ steps.get_test_groups.outputs.test_groups }}
-
-  execute-tests:
-    needs: get-test-groups
-    name: ${{ join(matrix.*, ', ') }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 240 # Timeout for all the processes, not each VMs (not all VMs are deployed at the same time)
-    permissions:
-      id-token: write # This is required for requesting the JWT
-    strategy:
-      max-parallel: 100 # Usage limits: https://docs.github.com/en/actions/learn-github-actions/usage-limits-billing-and-administration
-      matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
-        test-group:  ${{ fromJSON(needs.get-test-groups.outputs.test_groups) }}
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - name: Execute tests
-        uses: ./.github/actions/azureml-test
-        id: execute_tests
-        with:
-          EXP_NAME: recommenders-nightly-${{ matrix.test-group }}-python${{ matrix.python-version }}-${{ github.ref }}
-          ENV_NAME: recommenders-${{ github.sha }}-python${{ matrix.python-version }}${{ contains(matrix.test-group, 'gpu') && '-gpu' || '' }}${{ contains(matrix.test-group, 'spark') && '-spark' || '' }}
-          TEST_KIND: 'nightly'
-          AZUREML_TEST_UMI_CLIENT_ID: ${{ secrets.AZUREML_TEST_UMI_CLIENT_ID }}
-          AZUREML_TEST_UMI_TENANT_ID: ${{ secrets.AZUREML_TEST_UMI_TENANT_ID }}
-          AZUREML_TEST_UMI_SUB_ID: ${{ secrets.AZUREML_TEST_UMI_SUB_ID }}
-          AZUREML_TEST_SUBID: ${{ secrets.AZUREML_TEST_SUBID }}
-          PYTHON_VERSION: ${{ matrix.python-version }}
-          TEST_GROUP: ${{ matrix.test-group }}
+  run-tests:
+    uses: ./.github/workflows/tests.yml
+    with:
+      compute: cpu
+      timeout-minutes: 240  # Timeout for all the processes, not each VMs (not all VMs are deployed at the same time)
+      type: nightly

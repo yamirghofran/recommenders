@@ -1,0 +1,85 @@
+# ---------------------------------------------------------
+# Copyright (c) Recommenders contributors.
+# Licensed under the MIT License.
+# ---------------------------------------------------------
+
+# This is a reusable workflow called by other workflows to run
+# different groups of tests categorized by their types.
+
+name: Tests
+
+on:
+  workflow_call:
+    inputs:
+      compute:
+        required: false
+        type: string
+        default: cpu
+        description: Test compute - cpu, gpu or spark
+      config-file:
+        required: false
+        type: string
+        default: tests/test_groups.yml
+        description: Path to test group configuration file relative
+          to the repo root
+      dockerfile:
+        required: false
+        type: string
+        default: tools/docker/Dockerfile
+        description: Path to the Dockerfile used for building the
+          test environment
+      timeout-minutes:
+        required: true
+        type: number
+      type:
+        required: true
+        type: string
+        description: Type of test - pr_gate or nightly
+
+jobs:
+  get-test-groups:
+    # yq is required to run .github/actions/get-test-groups, and it
+    # is preinstalled on ubuntu-24.04
+    # (https://github.com/actions/runner-images/blob/9b8c9709431a8d2b295fd46cf96f283d671f20d9/images/ubuntu/Ubuntu2404-Readme.md?plain=1#L100)
+    runs-on: ubuntu-24.04
+    outputs:
+      groups: ${{ steps.get-test-groups.outputs.groups }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v5
+      - name: Get test group names
+        id: get-test-groups
+        uses: ./.github/actions/get-test-groups
+        with:
+          compute: ${{ inputs.compute }}
+          config-file: ${{ inputs.config-file }}
+          type: ${{ inputs.type }}
+
+  execute-tests:
+    name: ${{ join(matrix.*, ', ') }}
+    needs: get-test-groups
+    # TODO: Must use GPU if test group names contain 'gpu'
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, 3.10, 3.11]
+        group: ${{ fromJSON(needs.get-test-groups.outputs.groups) }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v5
+      - name: Set build args
+        shell: bash
+        run: >         
+          sed -e "s/^\(\s*ARG\s\+COMPUTE=\).*$/\1\"${{ contains(matrix.group, 'gpu') && 'gpu' || 'cpu' }}\"/"
+              -e "s/^\(\s*ARG\s\+EXTRAS=\).*$/\1\"[dev${{ contains(matrix.group, 'gpu') && ',gpu' || '' }}${{ contains(matrix.group, 'spark') && ',spark' || '' }}]\"/"
+              -e 's/^\(\s*ARG\s\+GIT_REF=\).*$/\1""/'
+              -e "s/^\(\s*ARG\s\+PYTHON_VERSION=\).*$/\1\"${{ matrix.python-version }}\"/"
+              ${{ inputs.dockerfile }}
+      - name: Execute tests
+        uses: ./.github/actions/group-test
+        with:
+          config-file: ${{ inputs.config-file }}
+          dockerfile: ${{ inputs.dockerfile }}
+          group: ${{ matrix.group }}
+          type: ${{ inputs.type }}
