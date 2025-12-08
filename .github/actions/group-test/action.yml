@@ -21,6 +21,7 @@ runs:
   using: docker
   # The path to Dockerfile should be relative to this action.yml
   image: ../../../tools/docker/Dockerfile
+  # entrypoint.sh must be executable
   entrypoint: entrypoint.sh
   args:
     - ${{ inputs.group }}
