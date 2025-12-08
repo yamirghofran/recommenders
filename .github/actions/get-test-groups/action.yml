@@ -46,9 +46,12 @@ runs:
       shell: bash
       run: |
         if [[ ${{ inputs.type }} == "nightly" ]]; then
-          TEST_GROUPS_STR=$(yq -o json -I 0 '[.${{ inputs.type }} | keys | .[] | select(contains("${{ inputs.compute }}"))]' ${{ inputs.config-file }})
+          TEST_GROUPS_STR=$(yq -o json -I 0 \
+            '[.${{ inputs.type }} | keys | .[] | select(contains("${{ inputs.compute }}"))]' \
+            ${{ inputs.config-file }})
         else
-          TEST_GROUPS_STR=$(yq -o json -I 0 '.${{ inputs.type }} | keys' ${{ inputs.config-file }})
+          TEST_GROUPS_STR=$(yq -o json -I 0 \
+            '.${{ inputs.type }} | keys' ${{ inputs.config-file }})
         fi
         echo "Test Groups: ${TEST_GROUPS_STR}"
         echo "groups=${TEST_GROUPS_STR}" >> $GITHUB_OUTPUT
