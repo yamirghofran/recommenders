@@ -3,7 +3,7 @@
 # Licensed under the MIT License.
 # ---------------------------------------------------------
 
-name: azureml-spark-nightly
+name: spark-nightly
 
 on:
   # Stopped AzureML MLOps. See #2251

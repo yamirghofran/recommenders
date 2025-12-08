@@ -3,7 +3,7 @@
 # Licensed under the MIT License.
 # ---------------------------------------------------------
 
-name: azureml-cpu-nightly
+name: cpu-nightly
 
 on:
   # Stopped AzureML MLOps. See #2251

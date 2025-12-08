@@ -3,7 +3,7 @@
 # Licensed under the MIT License.
 # ---------------------------------------------------------
 
-name: azureml-unit-tests
+name: unit-tests
 
 on:
   pull_request:

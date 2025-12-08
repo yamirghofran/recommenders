@@ -3,7 +3,7 @@
 # Licensed under the MIT License.
 # ---------------------------------------------------------
 
-name: azureml-gpu-nightly
+name: gpu-nightly
 
 on:
   # Stopped AzureML MLOps. See #2251
