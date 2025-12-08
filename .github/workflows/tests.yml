@@ -58,8 +58,7 @@ jobs:
   execute-tests:
     name: ${{ join(matrix.*, ', ') }}
     needs: get-test-groups
-    # TODO: Must use GPU if test group names contain 'gpu'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ contains(matrix.group, 'gpu') && 'ubuntu-gpu' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     strategy:
       matrix:

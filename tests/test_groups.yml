@@ -59,7 +59,9 @@ nightly:
     - tests/functional/examples/test_notebooks_python.py::test_vw_deep_dive_functional
     - tests/functional/examples/test_notebooks_python.py::test_nni_tuning_svd
 
-  group_gpu_001: # Total group time: 1937.01s
+  group_gpu:
+    # This group was originally 7 test groups, but now is one big group running on a single GPU.
+    # group_gpu_001: Total group time: 1937.01s
     - tests/unit/examples/test_notebooks_gpu.py::test_gpu_vm # 0.76s (Always the first test to check the GPU works)
     - tests/smoke/recommenders/models/test_deeprec_utils.py # 2.91
     - tests/smoke/recommenders/models/test_deeprec_model.py::test_FFM_iterator # 0.74s
@@ -76,7 +78,7 @@ nightly:
     - tests/functional/examples/test_notebooks_gpu.py::test_slirec_quickstart_functional # 175.00s
     - tests/smoke/recommenders/models/test_deeprec_model.py::test_model_slirec # 346.72s
 
-  group_gpu_002: # Total group time: 1896.76s
+    # group_gpu_002: Total group time: 1896.76s
     - tests/unit/examples/test_notebooks_gpu.py::test_gpu_vm # 0.76s (Always the first test to check the GPU works)
     - tests/smoke/recommenders/models/test_deeprec_model.py::test_model_xdeepfm # 3.10s
     # FIXME: https://github.com/microsoft/recommenders/issues/1883
@@ -93,7 +95,7 @@ nightly:
     - tests/smoke/examples/test_notebooks_gpu.py::test_embdotbias_smoke # 30.99s
     - tests/functional/examples/test_notebooks_gpu.py::test_embdotbias_functional # 483.73s
 
-  group_gpu_003: # Total group time: 2072.15s
+    # group_gpu_003: Total group time: 2072.15s
     - tests/unit/examples/test_notebooks_gpu.py::test_gpu_vm # 0.76s (Always the first test to check the GPU works)
     - tests/smoke/examples/test_notebooks_gpu.py::test_ncf_smoke # 114.39s
     - tests/functional/examples/test_notebooks_gpu.py::test_ncf_functional # 1046.97s
@@ -104,7 +106,7 @@ nightly:
     # FIXME: https://github.com/microsoft/recommenders/issues/1883
     # - tests/smoke/recommenders/models/test_newsrec_model.py::test_model_naml  # 450.65s
 
-  group_gpu_004: # Total group time: 2103.34s
+    # group_gpu_004: Total group time: 2103.34s
     - tests/unit/examples/test_notebooks_gpu.py::test_gpu_vm # 0.76s (Always the first test to check the GPU works)
     - tests/smoke/examples/test_notebooks_gpu.py::test_nrms_smoke # 232.55s
     # FIXME: https://github.com/microsoft/recommenders/issues/1883
@@ -114,7 +116,7 @@ nightly:
     # FIXME: https://github.com/microsoft/recommenders/issues/1883
     # - tests/functional/examples/test_notebooks_gpu.py::test_lstur_quickstart_functional  # 766.52s
 
-  group_gpu_005: # Total group time: 1844.05s
+    # group_gpu_005: Total group time: 1844.05s
     - tests/unit/examples/test_notebooks_gpu.py::test_gpu_vm # 0.76s (Always the first test to check the GPU works)
     # FIXME: https://github.com/microsoft/recommenders/issues/1883
     # - tests/functional/examples/test_notebooks_gpu.py::test_wide_deep_functional  # 1843.29s
@@ -123,12 +125,12 @@ nightly:
     # FIXME: https://github.com/microsoft/recommenders/issues/1883
     # - tests/functional/examples/test_notebooks_gpu.py::test_npa_quickstart_functional  # 810.92s
 
-  group_gpu_006: # Total group time: 1763.99s
+    # group_gpu_006: Total group time: 1763.99s
     - tests/unit/examples/test_notebooks_gpu.py::test_gpu_vm # 0.76s (Always the first test to check the GPU works)
     - tests/smoke/recommenders/models/test_newsrec_model.py::test_model_npa # 202.61s
     - tests/smoke/recommenders/models/test_newsrec_model.py::test_model_nrms # 188.60s
 
-  group_gpu_007: # Total group time: 846.89s
+    # group_gpu_007: Total group time: 846.89s
     - tests/unit/examples/test_notebooks_gpu.py::test_gpu_vm # 0.76s (Always the first test to check the GPU works)
     # FIXME: https://github.com/microsoft/recommenders/issues/1883
     # - tests/smoke/examples/test_notebooks_gpu.py::test_naml_smoke  # 620.13s
@@ -369,7 +371,9 @@ pr_gate:
     # Refer to the issue: https://github.com/microsoft/recommenders/issues/1770
     # - tests/unit/examples/test_notebooks_pyspark.py::test_spark_tuning  # 212.29s+190.02s+180.13s+164.09s=746.53s (flaky test, it rerun several times)
 
-  group_gpu_001: # Total group time: 492.62s
+  group_gpu:
+    # This group was originally 4 test groups, but now is one big group running on a single GPU.
+    # group_gpu_001: Total group time: 492.62s
     - tests/unit/examples/test_notebooks_gpu.py::test_gpu_vm # 0.76s (Always the first test to check the GPU works)
     - tests/unit/recommenders/models/test_rbm.py::test_class_init
     - tests/unit/recommenders/models/test_rbm.py::test_sampling_funct
@@ -413,7 +417,7 @@ pr_gate:
     - tests/unit/recommenders/utils/test_tf_utils.py::test_pandas_input_fn_for_saved_model
     - tests/unit/recommenders/utils/test_tf_utils.py::test_build_optimizer
 
-  group_gpu_002: # Total group time:
+    # group_gpu_002: Total group time:
     - tests/unit/examples/test_notebooks_gpu.py::test_gpu_vm # 0.76s (Always the first test to check the GPU works)
     # - tests/unit/recommenders/models/test_deeprec_model.py::test_xdeepfm_component_definition  # FIXME: Disabled due to the issue with TF version > 2.10.1 See #2018
     - tests/unit/recommenders/models/test_deeprec_model.py::test_dkn_component_definition
@@ -428,14 +432,14 @@ pr_gate:
     - tests/security/test_dependency_security.py::test_torch
     - tests/regression/test_compatibility_tf.py
 
-  group_notebooks_gpu_001: # Total group time: 563.35s
+    # group_notebooks_gpu_001: Total group time: 563.35s
     - tests/unit/examples/test_notebooks_gpu.py::test_gpu_vm # 0.76s (Always the first test to check the GPU works)
     - tests/unit/examples/test_notebooks_gpu.py::test_dkn_quickstart
     - tests/unit/examples/test_notebooks_gpu.py::test_ncf
     - tests/unit/examples/test_notebooks_gpu.py::test_ncf_deep_dive
     - tests/unit/examples/test_notebooks_gpu.py::test_embdotbias
 
-  group_notebooks_gpu_002: # Total group time: 241.15s
+    # group_notebooks_gpu_002: Total group time: 241.15s
     - tests/unit/examples/test_notebooks_gpu.py::test_gpu_vm # 0.76s (Always the first test to check the GPU works)
     - tests/unit/examples/test_notebooks_gpu.py::test_wide_deep
     - tests/unit/examples/test_notebooks_gpu.py::test_xdeepfm

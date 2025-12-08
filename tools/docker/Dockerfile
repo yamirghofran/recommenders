@@ -53,6 +53,11 @@ USER root:root
 
 SHELL ["/bin/bash", "-c"]
 
+# Install yq
+# See https://github.com/mikefarah/yq
+RUN wget https://github.com/mikefarah/yq/releases/download/v4.2.0/yq_linux_amd64.tar.gz -O - |\
+    tar xz && sudo mv yq_linux_amd64 /usr/local/bin/yq
+
 # Install Conda
 RUN wget -qO /tmp/conda.sh "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh" && \
     bash /tmp/conda.sh -bf -p /root/conda && \

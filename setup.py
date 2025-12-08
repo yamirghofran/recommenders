@@ -68,6 +68,7 @@ extras_require = {
         "pytest>=7.2.1",
         "pytest-cov>=4.1.0",
         "pytest-mock>=3.10.0",  # for access to mock fixtures in pytest
+        "pytest-xdist>=3.1.0",  # for running tests in parallel
     ],
 }
 # For the brave of heart
