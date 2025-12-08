@@ -9,10 +9,6 @@ inputs:
   config-file:
     required: true
     description: Test group configuraiton file
-  dockerfile:
-    required: true
-    description: Path to the Dockerfile used for building the test
-      environment
   group:
     required: true
     description: Test group name
@@ -23,7 +19,8 @@ inputs:
 
 runs:
   using: docker
-  image: ${{ inputs.dockerfile }}
+  # The path to Dockerfile should be relative to this action.yml
+  image: ../../../tools/docker/Dockerfile
   entrypoint: entrypoint.sh
   args:
     - ${{ inputs.group }}
