@@ -50,7 +50,7 @@ def dkn_files(deeprec_resource_path):
     contextEmb_file = os.path.join(data_path, "TransE_context2vec_100.npy")
 
     download_deeprec_resources(
-        "https://recodatasets.z20.web.core.windows.net/deeprec/",
+        "https://raw.githubusercontent.com/recommenders-team/resources/main/deeprec/",
         data_path,
         "mind-demo.zip",
     )
@@ -122,7 +122,7 @@ def test_xdeepfm_component_definition(deeprec_resource_path):
 
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/deeprec/",
+            "https://raw.githubusercontent.com/recommenders-team/resources/main/deeprec/",
             data_path,
             "xdeepfmresources.zip",
         )

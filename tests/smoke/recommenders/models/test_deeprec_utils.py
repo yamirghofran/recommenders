@@ -34,7 +34,7 @@ def test_DKN_iterator(deeprec_resource_path):
     contextEmb_file = os.path.join(data_path, "TransE_context2vec_100.npy")
     yaml_file = os.path.join(data_path, "dkn.yaml")
     download_deeprec_resources(
-        "https://recodatasets.z20.web.core.windows.net/deeprec/",
+        "https://raw.githubusercontent.com/recommenders-team/resources/main/deeprec/",
         data_path,
         "mind-demo.zip",
     )

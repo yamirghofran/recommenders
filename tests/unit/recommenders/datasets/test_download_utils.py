@@ -61,7 +61,7 @@ def test_maybe_download_retry(caplog):
     caplog.set_level(logging.INFO)
     with pytest.raises(requests.exceptions.HTTPError):
         maybe_download(
-            "https://recodatasets.z20.web.core.windows.net/non_existing_file.zip"
+            "https://raw.githubusercontent.com/recommenders-team/resources/main/non_existing_file.zip"
         )
         assert "Problem downloading" in caplog.text
 
