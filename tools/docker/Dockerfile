@@ -48,11 +48,14 @@ ARG PYTHON_VERSION="3.11"
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
+WORKDIR /root
+USER root:root
+
 SHELL ["/bin/bash", "-c"]
 
 # Install yq
 # See https://github.com/mikefarah/yq
-RUN wget https://github.com/mikefarah/yq/releases/download/v4.2.0/yq_linux_amd64.tar.gz -O - |\
+RUN wget https://github.com/mikefarah/yq/releases/download/v4.49.2/yq_linux_amd64.tar.gz -O - |\
     tar xz && mv yq_linux_amd64 /usr/local/bin/yq
 
 # Install Conda

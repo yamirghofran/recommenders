@@ -76,8 +76,8 @@ jobs:
               -e 's/^\(\s*ARG\s\+GIT_REF=\).*$/\1""/' \
               -e "s/^\(\s*ARG\s\+PYTHON_VERSION=\).*$/\1\"${{ matrix.python-version }}\"/" \
               -i ${{ inputs.dockerfile }}
-          # Copy recommenders/, tests/ and entrypoint.sh to be along with Dockerfile
-          cp -r setup.py recommenders tests .github/actions/group-test/entrypoint.sh tools/docker/
+          # Copy recommenders to be along with Dockerfile
+          cp -r setup.py recommenders tools/docker/
       - name: Execute tests
         uses: ./.github/actions/group-test
         with:
