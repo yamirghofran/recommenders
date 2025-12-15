@@ -22,7 +22,7 @@ runs:
   # The path to Dockerfile should be relative to this action.yml
   image: ../../../tools/docker/Dockerfile
   # entrypoint.sh must be executable
-  entrypoint: '.github/actions/group-test/entrypoint.sh'
+  entrypoint: '/root/Recommenders/entrypoint.sh'
   args:
     - ${{ inputs.group }}
     - ${{ inputs.type }}
