@@ -98,7 +98,7 @@ COPY ./ ${RECO_DIR}
 # Install Recommenders and its dependencies
 RUN source /root/conda/bin/activate && \
     conda activate Recommenders && \
-    if [[ "${EXTRAS}" =~ spark ]]; then conda install -c conda-forge -y "openjdk>=${JDK_VERSION}"; fi && \
+    if [[ "${EXTRAS}" =~ spark ]]; then conda install -c conda-forge -y "openjdk>=${JDK_VERSION},<24"; fi && \
     if [ -z "${GIT_REF}" ]; then \
         pip install ${RECO_DIR}${EXTRAS}; \
     else \
