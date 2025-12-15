@@ -48,9 +48,6 @@ ARG PYTHON_VERSION="3.11"
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
-WORKDIR /root
-USER root:root
-
 SHELL ["/bin/bash", "-c"]
 
 # Install yq
