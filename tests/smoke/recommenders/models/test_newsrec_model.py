@@ -30,19 +30,19 @@ def test_model_nrms(mind_resource_path):
 
     if not os.path.exists(train_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "train"),
             "MINDdemo_train.zip",
         )
     if not os.path.exists(valid_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "valid"),
             "MINDdemo_dev.zip",
         )
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "utils"),
             "MINDdemo_utils.zip",
         )
@@ -62,7 +62,11 @@ def test_model_nrms(mind_resource_path):
     assert model.run_eval(valid_news_file, valid_behaviors_file) is not None
     assert isinstance(
         model.fit(
-            train_news_file, train_behaviors_file, valid_news_file, valid_behaviors_file,step_limit=10
+            train_news_file,
+            train_behaviors_file,
+            valid_news_file,
+            valid_behaviors_file,
+            step_limit=10,
         ),
         BaseModel,
     )
@@ -83,19 +87,19 @@ def test_model_naml(mind_resource_path):
 
     if not os.path.exists(train_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "train"),
             "MINDdemo_train.zip",
         )
     if not os.path.exists(valid_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "valid"),
             "MINDdemo_dev.zip",
         )
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "utils"),
             "MINDdemo_utils.zip",
         )
@@ -115,7 +119,11 @@ def test_model_naml(mind_resource_path):
     assert model.run_eval(valid_news_file, valid_behaviors_file) is not None
     assert isinstance(
         model.fit(
-            train_news_file, train_behaviors_file, valid_news_file, valid_behaviors_file,step_limit=10
+            train_news_file,
+            train_behaviors_file,
+            valid_news_file,
+            valid_behaviors_file,
+            step_limit=10,
         ),
         BaseModel,
     )
@@ -134,19 +142,19 @@ def test_model_lstur(mind_resource_path):
 
     if not os.path.exists(train_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "train"),
             "MINDdemo_train.zip",
         )
     if not os.path.exists(valid_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "valid"),
             "MINDdemo_dev.zip",
         )
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "utils"),
             "MINDdemo_utils.zip",
         )
@@ -166,7 +174,11 @@ def test_model_lstur(mind_resource_path):
     assert model.run_eval(valid_news_file, valid_behaviors_file) is not None
     assert isinstance(
         model.fit(
-            train_news_file, train_behaviors_file, valid_news_file, valid_behaviors_file,step_limit=10
+            train_news_file,
+            train_behaviors_file,
+            valid_news_file,
+            valid_behaviors_file,
+            step_limit=10,
         ),
         BaseModel,
     )
@@ -185,19 +197,19 @@ def test_model_npa(mind_resource_path):
 
     if not os.path.exists(train_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "train"),
             "MINDdemo_train.zip",
         )
     if not os.path.exists(valid_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "valid"),
             "MINDdemo_dev.zip",
         )
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "utils"),
             "MINDdemo_utils.zip",
         )
@@ -217,7 +229,11 @@ def test_model_npa(mind_resource_path):
     assert model.run_eval(valid_news_file, valid_behaviors_file) is not None
     assert isinstance(
         model.fit(
-            train_news_file, train_behaviors_file, valid_news_file, valid_behaviors_file,step_limit=10
+            train_news_file,
+            train_behaviors_file,
+            valid_news_file,
+            valid_behaviors_file,
+            step_limit=10,
         ),
         BaseModel,
     )
