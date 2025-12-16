@@ -27,7 +27,7 @@ def test_prepare_hparams(must_exist_attributes, deeprec_resource_path):
 
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            r"https://recodatasets.z20.web.core.windows.net/newsrec/",
+            r"https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(deeprec_resource_path, "mind", "utils"),
             "MINDdemo_utils.zip",
         )
@@ -48,7 +48,7 @@ def test_load_yaml_file(deeprec_resource_path):
 
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(deeprec_resource_path, "mind", "utils"),
             "MINDdemo_utils.zip",
         )

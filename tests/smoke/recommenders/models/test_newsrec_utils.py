@@ -27,19 +27,19 @@ def test_news_iterator(mind_resource_path):
 
     if not os.path.exists(train_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "train"),
             "MINDdemo_train.zip",
         )
     if not os.path.exists(valid_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "valid"),
             "MINDdemo_dev.zip",
         )
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "utils"),
             "MINDdemo_utils.zip",
         )
@@ -84,19 +84,19 @@ def test_naml_iterator(mind_resource_path):
 
     if not os.path.exists(train_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "train"),
             "MINDdemo_train.zip",
         )
     if not os.path.exists(valid_news_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "valid"),
             "MINDdemo_dev.zip",
         )
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "utils"),
             "MINDdemo_utils.zip",
         )

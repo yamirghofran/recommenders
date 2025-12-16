@@ -12,47 +12,47 @@ from recommenders.datasets.mind import download_mind, extract_mind
     "url, content_length, etag",
     [
         (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/MINDdemo_train.zip",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDdemo_train.zip",
             "17372879",
             '"0x8D8B8AD5B233930"',
         ),  # NOTE: the z20 blob returns the etag with ""
         (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/MINDdemo_dev.zip",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDdemo_dev.zip",
             "10080022",
             '"0x8D8B8AD5B188839"',
         ),
         (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/MINDdemo_utils.zip",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDdemo_utils.zip",
             "97292694",
             '"0x8D8B8AD5B126C3B"',
         ),
         (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/MINDsmall_train.zip",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDsmall_train.zip",
             "52994575",
             '"0x8DCC5A830190676"',
         ),
         (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/MINDsmall_dev.zip",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDsmall_dev.zip",
             "30948560",
             '"0x8DCC5A82E182A0F"',
         ),
         (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/MINDsmall_utils.zip",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDsmall_utils.zip",
             "155178106",
             '"0x8D8B8AD5B3677C6"',
         ),
         (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_train.zip",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDlarge_train.zip",
             "531360717",
             '"0x8DCC5A8375BDC1D"',
         ),
         (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_dev.zip",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDlarge_dev.zip",
             "103592887",
             '"0x8DCC5A82FE8609C"',
         ),
         (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_utils.zip",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/MINDlarge_utils.zip",
             "150359301",
             '"0x8D8B8AD5B2ED4C9"',
         ),

@@ -72,7 +72,7 @@ def sar_settings():
         # absolute tolerance parameter for matrix equivalence in SAR tests
         "ATOL": 1e-8,
         # directory of the current file - used to link unit test data
-        "FILE_DIR": "https://recodatasets.z20.web.core.windows.net/sarunittest/",
+        "FILE_DIR": "https://raw.githubusercontent.com/recommenders-team/resources/main/sarunittest/",
         # user ID used in the test files (they are designed for this user ID, this is part of the test)
         "TEST_USER_ID": "0003000098E85347",
     }

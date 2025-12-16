@@ -26,7 +26,7 @@ def test_nrms_component_definition(mind_resource_path):
 
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "utils"),
             "MINDdemo_utils.zip",
         )
@@ -58,7 +58,7 @@ def test_naml_component_definition(mind_resource_path):
 
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "utils"),
             "MINDdemo_utils.zip",
         )
@@ -90,7 +90,7 @@ def test_npa_component_definition(mind_resource_path):
 
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "utils"),
             "MINDdemo_utils.zip",
         )
@@ -120,7 +120,7 @@ def test_lstur_component_definition(mind_resource_path):
 
     if not os.path.exists(yaml_file):
         download_deeprec_resources(
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             os.path.join(mind_resource_path, "mind", "utils"),
             "MINDdemo_utils.zip",
         )

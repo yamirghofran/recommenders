@@ -310,7 +310,7 @@ def get_mind_data_set(type):
 
     if type == "large":
         return (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             "MINDlarge_train.zip",
             "MINDlarge_dev.zip",
             "MINDlarge_utils.zip",
@@ -318,7 +318,7 @@ def get_mind_data_set(type):
 
     elif type == "small":
         return (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             "MINDsmall_train.zip",
             "MINDsmall_dev.zip",
             "MINDsmall_utils.zip",
@@ -326,7 +326,7 @@ def get_mind_data_set(type):
 
     elif type == "demo":
         return (
-            "https://recodatasets.z20.web.core.windows.net/newsrec/",
+            "https://huggingface.co/datasets/Recommenders/MIND/resolve/main/",
             "MINDdemo_train.zip",
             "MINDdemo_dev.zip",
             "MINDdemo_utils.zip",
