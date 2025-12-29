@@ -224,7 +224,7 @@ $\to$ Create codespaces on the branch.
 
 [Dockerfile](./tools/docker/Dockerfile) is used in 3 places:
 * Dev containers on VS Code and GitHub Codespaces
-* [Testing workflows on AzureML](./tests/README.md)
+* [Testing workflows on GitHub Actions](./tests/README.md)
 * [Jupyter notebook examples on Docker](./tools/docker/README.md)
 
 </details>

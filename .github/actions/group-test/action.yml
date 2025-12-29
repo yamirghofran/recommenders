@@ -19,11 +19,12 @@ inputs:
 
 runs:
   using: docker
-  # The path to Dockerfile should be relative to this action.yml
+  # The path to Dockerfile should be relative to this action.yml.
+  # This path has to be hardcoded instead of being parameterized.
   image: ../../../tools/docker/Dockerfile
-  # The path to entrypoint.sh should be relative to the repo root
-  # because the repo root is mounted into the container as working dir,
-  # and entrypoint.sh must be executable
+  # The path to entrypoint.sh can be relative to the repo root,
+  # because the repo root is mounted into the working dir in the container.
+  # And entrypoint.sh must be executable.
   entrypoint: '.github/actions/group-test/entrypoint.sh'
   args:
     - ${{ inputs.group }}

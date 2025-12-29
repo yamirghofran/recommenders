@@ -5,7 +5,11 @@ Licensed under the MIT License.
 
 # Tests
 
-Recommenders test pipeline is one of the most sophisticated MLOps pipelines in the open-source community. We execute tests in the three environments we support: CPU, GPU, and Spark, mirroring the tests in each Python version we support. We not only tests the library, but also the Jupyter notebooks in the examples folder.
+Recommenders test pipeline is one of the most sophisticated MLOps
+pipelines in the open-source community.  We execute tests in the three
+environments we support: CPU, GPU, and Spark, mirroring the tests in
+each Python version we support.  We test not only the library, but
+also the Jupyter notebooks in the examples folder.
 
 The reason to have this extensive test infrastructure is to ensure that the code is reproducible by the community and that we can maintain the project with a small number of core contributors.
 
@@ -17,14 +21,14 @@ In this document we show our test infrastructure and how to contribute tests to 
 
 - [Test workflows](#test-workflows)
 - [Categories of tests](#categories-of-tests)
-- [Scalable test infrastructure with AzureML](#scalable-test-infrastructure-with-azureml)
+- [Scalable test infrastructure with GitHub Actions](#scalable-test-infrastructure-with-github-actions)
 - [How to contribute tests to the repository](#how-to-contribute-tests-to-the-repository)
     - [How to create tests for the Recommenders library](#how-to-create-tests-for-the-recommenders-library)
     - [How to create tests for the notebooks](#how-to-create-tests-for-the-notebooks)
-    - [How to add tests to the AzureML pipeline](#how-to-add-tests-to-the-azureml-pipeline)
-    - [Setup GitHub Actions with AzureML compute clusters](#setup-github-actions-with-azureml-compute-clusters)
+    - [How to add tests to the GitHub workflows](#How-to-add-tests-to-the-GitHub-workflows)
+- [How to setup GitHub Actions with large runners](#how-to-setup-github-actions-with-large-runners)
 - [How to execute tests in your local environment](#how-to-execute-tests-in-your-local-environment)
-- [Other relevant information](#other-relevant-information)
+
 
 ## Test workflows
 
@@ -52,38 +56,49 @@ The tests in this repository are divided into the following categories:
 
 For more information, see a [quick introduction testing](https://miguelgfierro.com/blog/2018/a-beginners-guide-to-python-testing/).
 
-## Scalable test infrastructure with AzureML
+## Scalable test infrastructure with GitHub Actions
 
-AzureML is used to run the existing unit, smoke and integration tests. AzureML benefits include being able to run the tests in parallel, managing the compute environment by automatically turning it on/off, automatic logging of artifacts from test runs and more. GitHub is used as a control plane to configure and run the tests on AzureML.  
+GitHub Actions is used to run the existing unit, smoke and integration
+tests.  GitHub Actions benefits include being able to run the tests in
+parallel, and automatic logging of artifacts from test runs and more.
 
-In the following figure we show a workflow on how the tests are executed via AzureML:
+In the following figure we show a workflow on how the tests are
+executed via GitHub Actions:
 
-<img src="https://raw.githubusercontent.com/recommenders-team/resources/main/images/AzureML_tests.svg?sanitize=true">
+<img src="./github-actions-tests.svg">
 
-GitHub workflows `azureml-unit-tests.yml`, `azureml-cpu-nightly.yml`, `azureml-gpu-nightly.yml` and `azureml-spark-nightly` located in [.github/workflows/](../.github/workflows/) are used to run the tests on AzureML. The parameters to configure AzureML are defined in the workflow yml files. The tests are divided into groups and each workflow triggers these test groups in parallel, which significantly reduces end-to-end execution time. 
+GitHub workflows `unit-tests.yml`, `cpu-nightly.yml`,
+`gpu-nightly.yml` and `spark-nightly.yml` located in
+[.github/workflows/](../.github/workflows/) are used to run the tests.
+The tests are divided into groups and each workflow triggers these
+test groups in parallel, which significantly reduces end-to-end
+execution time.
 
-There are three scripts used with each workflow, all of them are located in [ci/azureml_tests](./ci/azureml_tests/):
+These workflows is composed of:
+* two actions
+  + [`actions/get-test-groups`](../.github/actions/get-test-groups/action.yml):
+    this action extracts test groups collected in the configuration
+    file [`test_groups.yml`](./test_groups.yml) to be run in parallel
+    in the workflows.
+  + [`actions/group-test`](../.github/actions/group-test/action.yml):
+    this action runs one test group output from
+    [`actions/get-test-groups`](../.github/actions/get-test-groups/action.yml)
+    in a Docker container with appropriate environment set up in the
+    [`Dockerfile`](../tools/docker/Dockerfile).  More details on
+    Docker support can be found at
+    [tools/docker/README.md](../tools/docker/README.md).
+* one [reusable workflow](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations)
+  + [`workflows/tests.yml`](../.github/workflows/tests.yml): this
+    reusable workflow is used by other workflows configured for
+    different compute environments and test categories.
+* one configuration file
+  + [`test_groups.yml`](./test_groups.yml): this configuration file
+    defines the groups of tests.
+    - If the tests are part of the unit tests, the total compute time
+      of each group should be less than 15min.
+    - If the tests are part of the nightly builds, the total time of
+      each group should be less than 35min.
 
-* [`submit_groupwise_azureml_pytest.py`](./ci/azureml_tests/submit_groupwise_azureml_pytest.py):
-  this script uses parameters in the workflow yml to set up the
-  AzureML environment for testing using the AzureML SDK.
-* [`run_groupwise_pytest.py`](./ci/azureml_tests/run_groupwise_pytest.pyy):
-  this script uses pytest to run the tests of the libraries and
-  notebooks. This script runs in an AzureML workspace with the
-  environment created by the script above.
-* [`aml_utils.py`](./ci/azureml_tests/aml_utils.py): this script
-  defines several utility functions using
-  [the AzureML Python SDK v2](https://learn.microsoft.com/en-us/azure/machine-learning/concept-v2?view=azureml-api-2).
-  These functions are used by the scripts above to set up the compute and
-  the environment for the tests on AzureML.  For example, the
-  environment with all dependencies of Recommenders is created by the
-  function `get_or_create_environment` via the [Dockerfile](../tools/docker/Dockerfile).
-  More details on Docker support can be found at [tools/docker/README.md](../tools/docker/README.md).
-* [`test_groups.py`](./ci/azureml_tests/test_groups.py): this script
-  defines the groups of tests. If the tests are part of the unit
-  tests, the total compute time of each group should be less than
-  15min. If the tests are part of the nightly builds, the total time
-  of each group should be less than 35min.
 
 ## How to contribute tests to the repository
 
@@ -92,9 +107,12 @@ In this section we show how to create tests and add them to the test pipeline. T
 1. Create your code in the library and/or notebooks.
 1. Design the unit tests for the code.
 1. If you have written a notebook, design the notebook tests and check that the metrics they return is what you expect.
-1. Add the tests to the AzureML pipeline in the corresponding [test group](./ci/azureml_tests/test_groups.py). 
+1. Add the tests to the GitHub workflows in the corresponding [test
+   group](./test_groups.yml).
 
-**Please note that if you don't add your tests to the pipeline, they will not be executed.**
+**Please note that if you don't add your tests to the workflows, they
+will not be executed.**
+
 
 ### How to create tests for the Recommenders library
 
@@ -196,89 +214,88 @@ For executing this test, first make sure you are in the correct environment as d
 pytest tests/smoke/examples/test_notebooks_python.py::test_sar_single_node_smoke
 ```
 
-### How to add tests to the AzureML pipeline
+### How to add tests to the GitHub workflows
 
-To add a new test to the AzureML pipeline, add the test path to an appropriate test group listed in [test_groups.py](./ci/azureml_tests/test_groups.py). 
+To add a new test to the GitHub workflows, add the test path to an
+appropriate test group listed in [test_groups.yml](./test_groups.yml).
 
-Tests in `group_cpu_xxx` groups are executed on a CPU-only AzureML compute cluster node. Tests in `group_gpu_xxx` groups are executed on a GPU-enabled AzureML compute cluster node with GPU related dependencies added to the AzureML run environment. Tests in `group_pyspark_xxx` groups are executed on a CPU-only AzureML compute cluster node, with the PySpark related dependencies added to the AzureML run environment. 
+Tests in `group_cpu_xxx` groups are executed on a CPU-only GitHub
+compute node.  Tests in `group_gpu_xxx` groups are executed on a
+GPU-enabled compute node with GPU related dependencies added to the
+environment.  Tests in `group_pyspark_xxx` groups are executed on a
+CPU-only compute node, with the PySpark related dependencies added to
+the environment.
 
-It's important to keep in mind while adding a new test that the runtime of the test group should not exceed the specified threshold in [test_groups.py](./ci/azureml_tests/test_groups.py).
+It's important to keep in mind while adding a new test that the
+runtime of the test group should not exceed the specified threshold in
+[test_groups.yml](./test_groups.yml).
 
 Example of adding a new test:
 
 1. In the environment that you are running your code, first see if there is a group whose total runtime is less than the threshold.
-```python
-"group_spark_001": [  # Total group time: 271.13s
-    "tests/data_validation/recommenders/datasets/test_movielens.py::test_load_spark_df",  # 4.33s+ 25.58s + 101.99s + 139.23s
-],
+
+```yaml
+group_spark_001: # Total group time: 271.13s
+  - tests/data_validation/recommenders/datasets/test_movielens.py::test_load_spark_df  # 4.33s+ 25.58s + 101.99s + 139.23s
 ```
+
 2. Add the test to the group, add the time it takes to compute, and update the total group time.
-```python
-"group_spark_001": [  # Total group time: 571.13s
-    "tests/data_validation/recommenders/datasets/test_movielens.py::test_load_spark_df",  # 4.33s+ 25.58s + 101.99s + 139.23s
-    #
-    "tests/path/to/test_new.py::test_new_function", # 300s
-],
+
+```yaml
+group_spark_001: [  # Total group time: 571.13s
+  -  tests/data_validation/recommenders/datasets/test_movielens.py::test_load_spark_df  # 4.33s+ 25.58s + 101.99s + 139.23s
+  -  tests/path/to/test_new.py::test_new_function  # 300s
 ```
+
 3. If all the groups of your environment are above the threshold, add a new group.
 
-### Setup GitHub Actions with AzureML compute clusters
 
-In this section we explain how to create the AzureML infrastructure to run the tests in GitHub Actions.
+## How to setup GitHub Actions with large runners
 
-In order to execute the tests in Recommenders, we need two types of virtual machines: ones without GPU, to execute the CPU and Spark tests, and ones with GPU, to execute the GPU tests. Therefore, the first step is to request enough quota for your subscription.
+In this section we explain how to create the infrastructure to run the
+tests in GitHub Actions.
 
-Then, follow the steps below to create the AzureML infrastructure:
+In order to execute the tests in Recommenders, we need two types of
+virtual machines: ones without GPU, to execute the CPU and Spark
+tests, and ones with GPU, to execute the GPU tests.  Therefore, the
+first step is to add a large GPU runner to the organization.  We now
+have only one [GitHub-hosted GPU
+runner](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners)
+called
+[ubuntu-gpu](https://github.com/organizations/recommenders-team/settings/actions/github-hosted-runners/4?viewing_from_runner_group=true)
+in the runner group
+[recommenders-gpu](https://github.com/organizations/recommenders-team/settings/actions/runner-groups/4).
+1. Make sure that the current GitHub base plan is Team plan, because
+   GitHub large runners are only available for organizations using the
+   GitHub Team or GitHub Enterprise Cloud plans.
+   * Navigate to the setting page of the organization instead of the
+     repo $\to$ Billing and licensing $\to$ Licensing $\to$ Current
+     GitHub base plan, then choose either Team plan or Enterprise
+     plan.
+   * See also [Larger runners
+     reference](https://docs.github.com/en/actions/reference/runners/larger-runners)
+     and [Actions runner
+     pricing](https://docs.github.com/en/billing/reference/actions-runner-pricing#gpu-powered-larger-runners).
+1. Follow the steps described in [Adding a larger runner to an
+   organization](https://docs.github.com/en/actions/how-tos/manage-runners/larger-runners/manage-larger-runners#adding-a-larger-runner-to-an-organization).
+   * Click Actions $\to$ Runners $\to$ New runner $\to$ New
+     GitHub-hosted runner.  After choosing Linux x64, navigate to
+     Image $\to$ Partner and check "NVIDIA GPU-Optimizaed Image for AI
+     and HPC", then GPU-powered options will show in Size.
 
-1. Create a new AzureML workspace.
-    - Name: `azureml-test-workspace`
-    - Resource group: `recommenders_project_resources`
-    - Location: *Make sure you have enough quota in the location you choose*
-1. Create two new clusters: `cpu-cluster` and `gpu-cluster`. Go to compute, then compute cluster, then new.
-    - Select the CPU VM base. Anything above 64GB of RAM, and 8 cores should be fine.
-    - Select the GPU VM base. Anything above 56GB of RAM, and 6 cores, and an NVIDIA K80 should be fine.
-1. Add the subscription ID to GitHub action secrets
-   [here](https://github.com/recommenders-team/recommenders/settings/secrets/actions).
-   * Create a new repository secret called `AZUREML_TEST_SUBID` and
-     add the subscription ID as the value.
-1. Set up [login with OpenID Connect
-   (OIDC)](https://github.com/marketplace/actions/azure-login#login-with-openid-connect-oidc-recommended)
-   for GitHub Actions.
-   1. Create a user-assigned managed identity (UMI) and assign the
-      following 3 roles of the AzureML workspace created above to the
-      UMI (See [Create a user-assigned managed
-      identity](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-manage-user-assigned-managed-identities?pivots=identity-mi-methods-azp#create-a-user-assigned-managed-identity)):
-      * AzureML Compute Operator
-      * AzureML Data Scientist
-      * Reader
-   1. [Create a federated identity credential on the UMI](https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation-create-trust-user-assigned-managed-identity?pivots=identity-wif-mi-methods-azp#github-actions-deploying-azure-resources)
-      with the following settings:
-      * Name: A unique name for the federated identity credential
-        within your application.
-      * Issuer: Set to `https://token.actions.githubusercontent.com`
-        for GitHub Actions.
-      * Subject: The subject claim format, e.g.,
-        `repo:recommenders-team/recommenders:ref:refs/heads/<branch-name>`:
-        + `repo:recommenders-team/recommenders:pull_request`
-        + `repo:recommenders-team/recommenders:ref:refs/heads/staging`
-        + `repo:recommenders-team/recommenders:ref:refs/heads/main`
-        + `repo:recommenders-team/recommenders:ref:refs/tags/1.2.1`
-      * Description: (Optional) A description of the credential.
-      * Audiences: Specifies who can use this credential; for GitHub
-        Actions, use `api://AzureADTokenExchange`.
-1. Create 3 Actions secrets
-   * `AZUREML_TEST_UMI_TENANT_ID`
-   * `AZUREML_TEST_UMI_SUB_ID`
-   * `AZUREML_TEST_UMI_CLIENT_ID`
-   
-   and use the UMI's tenant ID, subscription ID and client ID as the
-   values of the secrets, respectively, under the repository's
-   **Settings > Security > Secrets and variables > Actions**.
+Then, change the runner used in
+[`workflows/tests.yml`](../.github/workflows/tests.yml) accordingly by
+following the instructions in [Running jobs on larger
+runners](https://docs.github.com/en/actions/how-tos/manage-runners/larger-runners/use-larger-runners?platform=linux).
 
 
 ## How to execute tests in your local environment
 
-To manually execute the tests in the CPU, GPU or Spark environments, first **make sure you are in the correct environment as described in the [SETUP.md](../SETUP.md)**.
+To manually execute the tests in the CPU, GPU or Spark environments,
+first **make sure you are in the correct environment as described in
+the [SETUP.md](../SETUP.md)**.  In addition, [using VS Code together
+with Dev containers] for testing is much easier, since VS Code can
+detect tests automatically.
 
 ### CPU tests
 
@@ -332,52 +349,3 @@ Example:
     @pytest.mark.skipif(sys.platform == 'win32', reason="Not implemented on Windows")
     def test_to_skip():
         assert False
-
-## Other relevant information
-
-### Remove old container registry images and repositories
-
-First make sure that you have the role of `Container Registry Repository Contributor`. 
-
-When we compute a test on an AzureML compute, we generate a container image that is stored in the Azure Container Registry (ACR). Each image is stored in a repository. We need to periodically erase the images and repositories.
-
-To verify the usage of the container registry:
-
-```bash
-export ACR_NAME="<your_acr_name>"
-az acr show-usage --name "$ACR_NAME"
-```
-
-*NOTE: After purging the repositories, it can take a couple of hours to reflect the changes because the ACR garbage collector runs asynchronously.*
-
-To list all repositories:
-
-```bash
-az acr repository list --name $ACR_NAME -o tsv 
-```
-
-To [delete](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-delete) a specific repository: 
-
-```bash
-az acr repository delete --name "$ACR_NAME" --repository acr-helloworld
-```
-
-To list all repositories older than a specific date (without deleting), using parallel jobs `-P` and a per repo timeout (for long jobs):
-
-```bash
-az acr repository list --name $ACR_NAME -o tsv | xargs -P 5 -I {} timeout 15m az acr run --cmd "acr purge --filter '{}:.*' --ago 2d --untagged --dry-run" --registry $ACR_NAME /dev/null
-```
-
-To delete all repositories older than a specific date, using parallel jobs `-P` and a per repo timeout (for long jobs):
-
-```bash
-az acr repository list --name $ACR_NAME -o tsv | xargs -P 5 -I {} timeout 15m az acr run --cmd "acr purge --filter '{}:.*' --ago 2d --untagged" --registry $ACR_NAME /dev/null
-```
-
-To schedule a purge of all repositories older than a specific date, running every day at 12:00 PM UTC
-
-```bash
-az acr task create --name purge_all_repos_2dago --cmd "acr purge --filter '.*:.*' --ago 2d --untagged" --registry "$ACR_NAME" --schedule "0 12 * * *" --context /dev/null
-```
-
-

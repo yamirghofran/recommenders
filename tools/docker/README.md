@@ -8,8 +8,11 @@ tests included in this repository.  It is also used by
   [VS Code Dev Contianers](https://code.visualstudio.com/docs/devcontainers/containers)
   that can facilitate the development of Recommenders
   (See [Setup Guide](../../SETUP.md)),
-* and [tests/ci/azureml_tests/aml_utils.py](../../tests/ci/azureml_tests/aml_utils.py)
-  to create the environment in [the testing workflows of Recommenders](../../.github/workflows/) (See [Tests](../../tests/README.md)).
+* and
+  [.github/actions/group-test/action.yml](../../.github/actions/group-test/action.yml)
+  to create the environment in [the testing workflows of
+  Recommenders](../../.github/workflows/) (See
+  [Tests](../../tests/README.md)).
 
 Multiple environments are supported by using 
 [multistage builds](https://docs.docker.com/build/building/multi-stage/).
