@@ -38,7 +38,6 @@ except ImportError:
     pass  # skip this import if we are in cpu environment
 
 
-@pytest.mark.gpu
 @pytest.fixture(scope="module")
 def dkn_files(deeprec_resource_path):
     data_path = os.path.join(deeprec_resource_path, "dkn")
@@ -65,7 +64,6 @@ def dkn_files(deeprec_resource_path):
     )
 
 
-@pytest.mark.gpu
 @pytest.fixture(scope="module")
 def sequential_files(deeprec_resource_path):
     data_path = os.path.join(deeprec_resource_path, "slirec")
