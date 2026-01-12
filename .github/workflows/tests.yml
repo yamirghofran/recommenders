@@ -73,7 +73,9 @@ jobs:
         uses: actions/checkout@v5
       - name: Verify GPU
         shell: bash
-        run: nvidia-smi
+        run: |
+          nvidia-smi
+          dpkg -l | grep nvidia-container-toolkit
       # - name: Prepare for docker build
       #   shell: bash
       #   run: |
