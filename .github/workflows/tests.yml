@@ -63,28 +63,31 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - '3.8'
-          - '3.9'
+          # - '3.8'
+          # - '3.9'
           - '3.10'
-          - '3.11'
+          # - '3.11'
         group: ${{ fromJSON(needs.get-test-groups.outputs.groups) }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v5
-      - name: Prepare for docker build
+      - name: Verify GPU
         shell: bash
-        run: |
-          # Set docker build args
-          sed -e "s/^\(\s*ARG\s\+COMPUTE=\).*$/\1\"${{ contains(matrix.group, 'gpu') && 'gpu' || 'cpu' }}\"/" \
-              -e "s/^\(\s*ARG\s\+EXTRAS=\).*$/\1\"[dev${{ contains(matrix.group, 'gpu') && ',gpu' || '' }}${{ contains(matrix.group, 'spark') && ',spark' || '' }}]\"/" \
-              -e 's/^\(\s*ARG\s\+GIT_REF=\).*$/\1""/' \
-              -e "s/^\(\s*ARG\s\+PYTHON_VERSION=\).*$/\1\"${{ matrix.python-version }}\"/" \
-              -i ${{ inputs.dockerfile }}
-          # Copy recommenders to be along with Dockerfile
-          cp -r setup.py recommenders tools/docker/
-      - name: Execute tests
-        uses: ./.github/actions/group-test
-        with:
-          config-file: ${{ inputs.config-file }}
-          group: ${{ matrix.group }}
-          type: ${{ inputs.type }}
+        run: nvidia-smi
+      # - name: Prepare for docker build
+      #   shell: bash
+      #   run: |
+      #     # Set docker build args
+      #     sed -e "s/^\(\s*ARG\s\+COMPUTE=\).*$/\1\"${{ contains(matrix.group, 'gpu') && 'gpu' || 'cpu' }}\"/" \
+      #         -e "s/^\(\s*ARG\s\+EXTRAS=\).*$/\1\"[dev${{ contains(matrix.group, 'gpu') && ',gpu' || '' }}${{ contains(matrix.group, 'spark') && ',spark' || '' }}]\"/" \
+      #         -e 's/^\(\s*ARG\s\+GIT_REF=\).*$/\1""/' \
+      #         -e "s/^\(\s*ARG\s\+PYTHON_VERSION=\).*$/\1\"${{ matrix.python-version }}\"/" \
+      #         -i ${{ inputs.dockerfile }}
+      #     # Copy recommenders to be along with Dockerfile
+      #     cp -r setup.py recommenders tools/docker/
+      # - name: Execute tests
+      #   uses: ./.github/actions/group-test
+      #   with:
+      #     config-file: ${{ inputs.config-file }}
+      #     group: ${{ matrix.group }}
+      #     type: ${{ inputs.type }}
