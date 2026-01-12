@@ -16,18 +16,18 @@ ARG COMPUTE="cpu"
 # Choose an appropriate CPU compute image
 #####################################################################
 # * [buildpack-deps:24.04](https://github.com/docker-library/buildpack-deps/blob/master/ubuntu/noble/Dockerfile)
-#   + [Created on 2024-08-17](https://hub.docker.com/layers/library/buildpack-deps/noble/images/sha256-dbfee7e7ee2340b0d6567efd3a8a9281ce45ee78598485b4d7a7f09fe641811a)
-FROM buildpack-deps@sha256:dbfee7e7ee2340b0d6567efd3a8a9281ce45ee78598485b4d7a7f09fe641811a AS cpu
+#   + [Created on 2025-11-14](https://hub.docker.com/layers/library/buildpack-deps/noble/images/sha256-40ee16e3f341497dfd8ae089abe47e60447f714389028726a8c21a75ac405be3)
+FROM buildpack-deps:24.04@sha256:40ee16e3f341497dfd8ae089abe47e60447f714389028726a8c21a75ac405be3 AS cpu
 
 
 #####################################################################
 # Compute Stage - GPU
 # Choose an appropriate GPU compute image
 #####################################################################
-# * [nvidia/cuda:12.6.1-devel-ubuntu24.04](https://gitlab.com/nvidia/container-images/cuda/-/blob/master/dist/12.6.1/ubuntu2404/devel/Dockerfile)
-#   + [Created on 2024-09-13](https://hub.docker.com/layers/nvidia/cuda/12.6.1-devel-ubuntu24.04/images/sha256-bfc293f21611f3c47a3442cf6516ebfe99d529926a4bef4bc389ef02fd038800)
+# * [nvidia/cuda:13.1.0-devel-ubuntu24.04](https://gitlab.com/nvidia/container-images/cuda/-/blob/master/dist/13.1.0/ubuntu2404/devel/Dockerfile)
+#   + [Created on 2025-12-15](https://hub.docker.com/layers/nvidia/cuda/13.1.0-devel-ubuntu24.04/images/sha256-0725ed044e80c230fcd54218ae3edc2855897ef7813b20868bdb53b03b99ea1c)
 # * See also [AML GPU Base Image](https://github.com/Azure/AzureML-Containers/blob/master/base/gpu/openmpi4.1.0-cuda11.8-cudnn8-ubuntu22.04)
-FROM nvcr.io/nvidia/cuda:12.6.1-devel-ubuntu24.04@sha256:bfc293f21611f3c47a3442cf6516ebfe99d529926a4bef4bc389ef02fd038800 AS gpu
+FROM nvidia/cuda:13.1.0-devel-ubuntu24.04@sha256:0725ed044e80c230fcd54218ae3edc2855897ef7813b20868bdb53b03b99ea1c AS gpu
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive \
@@ -65,7 +65,7 @@ RUN wget -qO /tmp/conda.sh "https://repo.anaconda.com/miniconda/Miniconda3-lates
     rm -rf /root/conda/pkgs && \
     rm /tmp/conda.sh && \
     /root/conda/bin/conda init bash && \
-    /root/conda/bin/conda config --set auto_activate_base false 
+    /root/conda/bin/conda config --set auto_activate false 
 
 # Accept Conda Terms of Service for required channels
 RUN /root/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
