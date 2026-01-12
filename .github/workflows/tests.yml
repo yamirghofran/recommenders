@@ -58,7 +58,7 @@ jobs:
   execute-tests:
     name: ${{ join(matrix.*, ', ') }}
     needs: get-test-groups
-    runs-on: ${{ contains(matrix.group, 'gpu') && 'ubuntu-gpu' || 'ubuntu-24.04' }}
+    runs-on: ${{ contains(matrix.group, 'gpu') && 'self-hosted-ubuntu-gpu' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     strategy:
       matrix:
