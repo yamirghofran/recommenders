@@ -58,7 +58,7 @@ jobs:
   execute-tests:
     name: ${{ join(matrix.*, ', ') }}
     needs: get-test-groups
-    runs-on: ${{ contains(matrix.group, 'gpu') && 'self-hosted-ubuntu-gpu' || 'ubuntu-24.04' }}
+    runs-on: ${{ contains(matrix.group, 'gpu') && 'ubuntu-gpu' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     strategy:
       matrix:
@@ -71,17 +71,17 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v5
-      - name: Prepare for docker build
-        shell: bash
-        run: |
-          # Set docker build args
-          sed -e "s/^\(\s*ARG\s\+COMPUTE=\).*$/\1\"${{ contains(matrix.group, 'gpu') && 'gpu' || 'cpu' }}\"/" \
-              -e "s/^\(\s*ARG\s\+EXTRAS=\).*$/\1\"[dev${{ contains(matrix.group, 'gpu') && ',gpu' || '' }}${{ contains(matrix.group, 'spark') && ',spark' || '' }}]\"/" \
-              -e 's/^\(\s*ARG\s\+GIT_REF=\).*$/\1""/' \
-              -e "s/^\(\s*ARG\s\+PYTHON_VERSION=\).*$/\1\"${{ matrix.python-version }}\"/" \
-              -i ${{ inputs.dockerfile }}
-          # Copy recommenders to be along with Dockerfile
-          cp -r setup.py recommenders tools/docker/
+      # - name: Prepare for docker build
+      #   shell: bash
+      #   run: |
+      #     # Set docker build args
+      #     sed -e "s/^\(\s*ARG\s\+COMPUTE=\).*$/\1\"${{ contains(matrix.group, 'gpu') && 'gpu' || 'cpu' }}\"/" \
+      #         -e "s/^\(\s*ARG\s\+EXTRAS=\).*$/\1\"[dev${{ contains(matrix.group, 'gpu') && ',gpu' || '' }}${{ contains(matrix.group, 'spark') && ',spark' || '' }}]\"/" \
+      #         -e 's/^\(\s*ARG\s\+GIT_REF=\).*$/\1""/' \
+      #         -e "s/^\(\s*ARG\s\+PYTHON_VERSION=\).*$/\1\"${{ matrix.python-version }}\"/" \
+      #         -i ${{ inputs.dockerfile }}
+      #     # Copy recommenders to be along with Dockerfile
+      #     cp -r setup.py recommenders tools/docker/
       - name: Execute tests
         uses: ./.github/actions/group-test
         with:
