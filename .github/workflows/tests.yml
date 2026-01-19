@@ -74,7 +74,7 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v5
-      - name: Set up environment
+      - name: Set up base environment
         shell: bash
         run: |
           # Verify GPU
@@ -92,17 +92,18 @@ jobs:
           ~/conda/bin/conda config --set auto_activate false
           ~/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
           ~/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
-
+      - name: Install dependencies
+        shell: bash
+        run: |
           # Create Conda environment
           ~/conda/bin/conda create -n Recommenders -c conda-forge -y python=${{ matrix.python-version }} pip
 
           # Install Recommenders and its dependencies
-          source ~/conda/bin/activate
-          conda activate Recommenders
+          ~/conda/bin/conda activate Recommenders
           if [[ "${{ matrix.group }}" =~ spark ]]; then conda install -c conda-forge -y "openjdk>=21,<23"; fi
           pip install .${EXTRAS}[dev${{ contains(matrix.group, 'gpu') && ',gpu' || '' }}${{ contains(matrix.group, 'spark') && ',spark' || '' }}]
       - name: Execute tests
         shell: bash
         run: |
-          conda activate Recommenders
+          ~/conda/bin/conda activate Recommenders
           pytest -n auto --durations 0 $(yq ".${{ inputs.type }}.${{ matrix.group }} | map(@sh) | join(\" \")" "${{ inputs.config-file }}")
