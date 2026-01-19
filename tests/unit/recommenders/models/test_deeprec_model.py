@@ -337,7 +337,7 @@ def test_sum_component_definition(sequential_files, deeprec_config_path):
 
 
 @pytest.mark.gpu
-def test_lightgcn_component_definition(deeprec_resource_path, deeprec_config_path):
+def test_lightgcn_component_definition(deeprec_config_path):
     yaml_file = os.path.join(deeprec_config_path, "lightgcn.yaml")
 
     df = movielens.load_pandas_df(size="100k")
@@ -345,11 +345,7 @@ def test_lightgcn_component_definition(deeprec_resource_path, deeprec_config_pat
 
     data = ImplicitCF(train=train, test=test)
 
-    hparams = prepare_hparams(
-        yaml_file,
-        embed_size=64,
-        MODEL_DIR=os.path.join(deeprec_resource_path, "lightgcn", "model"),
-    )
+    hparams = prepare_hparams(yaml_file, embed_size=64)
     model = LightGCN(hparams, data)
 
     assert model.norm_adj is not None
