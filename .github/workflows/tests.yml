@@ -102,7 +102,7 @@ jobs:
           source ~/conda/bin/activate
           conda activate Recommenders
           if [[ "${{ matrix.group }}" =~ spark ]]; then conda install -c conda-forge -y "openjdk>=21,<23"; fi
-          if [[ "${{ matrix.group }}" =~ gpu ]]; then pip install pytest-xdist; fi
+          if [[ ! ${{ matrix.group }}" =~ gpu ]]; then pip install pytest-xdist; fi
           EXTRAS=dev${{ contains(matrix.group, 'gpu') && ',gpu' || '' }}${{ contains(matrix.group, 'spark') && ',spark' || '' }}
           pip install .["${EXTRAS}"]
       - name: Execute tests
