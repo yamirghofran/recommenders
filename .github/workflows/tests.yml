@@ -94,7 +94,7 @@ jobs:
           ~/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
 
           # Create Conda environment
-          /conda/bin/conda create -n Recommenders -c conda-forge -y python=${{ matrix.python-version }} pip
+          ~/conda/bin/conda create -n Recommenders -c conda-forge -y python=${{ matrix.python-version }} pip
 
           # Install Recommenders and its dependencies
           source /root/conda/bin/activate
