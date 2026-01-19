@@ -108,4 +108,4 @@ jobs:
         run: |
           source ~/conda/bin/activate
           conda activate Recommenders
-          pytest ${{ contains(matrix.group, 'gpu') && '' || '-n auto' }} --durations 0 $(yq ".${{ inputs.type }}.${{ matrix.group }} | map(@sh) | join(\" \")" "${{ inputs.config-file }}")
+          pytest -n ${{ contains(matrix.group, 'gpu') && '0' || 'auto' }} --durations 0 $(yq ".${{ inputs.type }}.${{ matrix.group }} | map(@sh) | join(\" \")" "${{ inputs.config-file }}")
