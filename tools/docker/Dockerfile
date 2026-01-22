@@ -43,7 +43,7 @@ RUN apt-get update && \
 #####################################################################
 FROM ${COMPUTE} AS deps
 
-# Valid versions: 3.8, 3.9, 3.10, 3.11
+# Valid versions: 3.9, 3.10, 3.11, 3.12
 ARG PYTHON_VERSION="3.11"
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
@@ -53,21 +53,26 @@ USER root:root
 
 SHELL ["/bin/bash", "-c"]
 
-# Install Conda
-RUN wget -qO /tmp/conda.sh "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh" && \
-    bash /tmp/conda.sh -bf -p /root/conda && \
-    /root/conda/bin/conda clean -ay && \
-    rm -rf /root/conda/pkgs && \
-    rm /tmp/conda.sh && \
-    /root/conda/bin/conda init bash && \
-    /root/conda/bin/conda config --set auto_activate_base false 
+# Install Python and uv
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y software-properties-common && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-venv python${PYTHON_VERSION}-dev && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
 
-# Accept Conda Terms of Service for required channels
-RUN /root/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
-RUN /root/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
 
-# Create Conda environment
-RUN /root/conda/bin/conda create -n Recommenders -c conda-forge -y python=${PYTHON_VERSION} pip
+# Create virtual environment with uv
+RUN uv venv /root/.venvs/Recommenders --python python${PYTHON_VERSION}
+
+# Activate virtual environment by default
+ENV VIRTUAL_ENV="/root/.venvs/Recommenders"
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
 
 #####################################################################
@@ -87,32 +92,35 @@ ARG JDK_VERSION="21"
 
 ARG RECO_DIR="/root/Recommenders"
 
+# Install Java (Temurin) for Spark support if needed
+RUN if [[ "${EXTRAS}" =~ spark ]]; then \
+        apt-get update && \
+        apt-get install -y wget apt-transport-https gpg && \
+        wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /usr/share/keyrings/adoptium.gpg && \
+        echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb $(. /etc/os-release && echo $VERSION_CODENAME) main" | tee /etc/apt/sources.list.d/adoptium.list && \
+        apt-get update && \
+        apt-get install -y temurin-${JDK_VERSION}-jdk && \
+        apt-get clean -y && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# Set JAVA_HOME for Spark
+ENV JAVA_HOME="/usr/lib/jvm/temurin-${JDK_VERSION}-jdk-amd64"
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
 # Copy Recommenders into the image
 COPY ./ ${RECO_DIR}
 
-# Install Recommenders and its dependencies
-RUN source /root/conda/bin/activate && \
-    conda activate Recommenders && \
-    if [[ "${EXTRAS}" =~ spark ]]; then conda install -c conda-forge -y "openjdk>=${JDK_VERSION}"; fi && \
-    if [ -z "${GIT_REF}" ]; then \
-        pip install ${RECO_DIR}${EXTRAS}; \
+# Install Recommenders and its dependencies using uv
+RUN if [ -z "${GIT_REF}" ]; then \
+        uv pip install ${RECO_DIR}${EXTRAS}; \
     else \
-        pip install recommenders${EXTRAS}@git+https://github.com/recommenders-team/recommenders.git@${GIT_REF}; \
+        uv pip install recommenders${EXTRAS}@git+https://github.com/recommenders-team/recommenders.git@${GIT_REF}; \
     fi && \
+    uv pip install jupyter ipykernel && \
     jupyter notebook --generate-config && \
     echo "c.MultiKernelManager.default_kernel_name = 'Recommenders'" >> /root/.jupyter/jupyter_notebook_config.py && \
     python -m ipykernel install --user --name Recommenders --display-name "Python (Recommenders)"
-
-# Activate Recommenders Conda environment
-ENV PS1='(Recommenders) \[\]\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\u@\h:\w\$ \[\]'
-ENV PATH="/root/conda/envs/Recommenders/bin:/root/conda/condabin:${PATH}"
-ENV CONDA_SHLVL='1'
-ENV CONDA_PROMPT_MODIFIER='(Recommenders) '
-ENV CONDA_PREFIX="/root/conda/envs/Recommenders"
-ENV CONDA_EXE="/root/conda/bin/conda"
-ENV CONDA_PYTHON_EXE="/root/conda/bin/python"
-ENV JAVA_HOME="/root/conda/envs/Recommenders/lib/jvm"
-ENV JAVA_LD_LIBRARY_PATH="${JAVA_HOME}/lib/server"
 
 # Setup Jupyter notebook
 EXPOSE 8888
