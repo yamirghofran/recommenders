@@ -4,12 +4,14 @@
 import random
 import numpy as np
 from tqdm import tqdm
-import tensorflow as tf
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 from recommenders.utils.timer import Timer
 
 
-class MultiHeadAttention(tf.keras.layers.Layer):
+class MultiHeadAttention(nn.Module):
     """
     - Q (query), K (key) and V (value) are split into multiple heads (num_heads)
     - each tuple (q, k, v) are fed to scaled_dot_product_attention
@@ -32,22 +34,21 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         self.depth = attention_dim // self.num_heads
 
-        self.Q = tf.keras.layers.Dense(self.attention_dim, activation=None)
-        self.K = tf.keras.layers.Dense(self.attention_dim, activation=None)
-        self.V = tf.keras.layers.Dense(self.attention_dim, activation=None)
-        self.dropout = tf.keras.layers.Dropout(self.dropout_rate)
+        self.Q = nn.Linear(self.attention_dim, self.attention_dim, bias=True)
+        self.K = nn.Linear(self.attention_dim, self.attention_dim, bias=True)
+        self.V = nn.Linear(self.attention_dim, self.attention_dim, bias=True)
+        self.dropout = nn.Dropout(self.dropout_rate)
 
-    def call(self, queries, keys):
+    def forward(self, queries, keys):
         """Model forward pass.
 
         Args:
-            queries (tf.Tensor): Tensor of queries.
-            keys (tf.Tensor): Tensor of keys
+            queries (torch.Tensor): Tensor of queries.
+            keys (torch.Tensor): Tensor of keys
 
         Returns:
-            tf.Tensor: Output tensor.
+            torch.Tensor: Output tensor.
         """
-
         # Linear projections
         Q = self.Q(queries)  # (N, T_q, C)
         K = self.K(keys)  # (N, T_k, C)
@@ -55,119 +56,120 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         # --- MULTI HEAD ---
         # Split and concat, Q_, K_ and V_ are all (h*N, T_q, C/h)
-        Q_ = tf.concat(tf.split(Q, self.num_heads, axis=2), axis=0)
-        K_ = tf.concat(tf.split(K, self.num_heads, axis=2), axis=0)
-        V_ = tf.concat(tf.split(V, self.num_heads, axis=2), axis=0)
+        Q_ = torch.cat(torch.split(Q, self.depth, dim=2), dim=0)
+        K_ = torch.cat(torch.split(K, self.depth, dim=2), dim=0)
+        V_ = torch.cat(torch.split(V, self.depth, dim=2), dim=0)
 
         # --- SCALED DOT PRODUCT ---
         # Multiplication
-        outputs = tf.matmul(Q_, tf.transpose(K_, [0, 2, 1]))  # (h*N, T_q, T_k)
+        outputs = torch.matmul(Q_, K_.transpose(1, 2))  # (h*N, T_q, T_k)
 
         # Scale
-        outputs = outputs / (K_.get_shape().as_list()[-1] ** 0.5)
+        outputs = outputs / (self.depth ** 0.5)
 
         # Key Masking
-        key_masks = tf.sign(tf.abs(tf.reduce_sum(keys, axis=-1)))  # (N, T_k)
-        key_masks = tf.tile(key_masks, [self.num_heads, 1])  # (h*N, T_k)
-        key_masks = tf.tile(
-            tf.expand_dims(key_masks, 1), [1, tf.shape(queries)[1], 1]
-        )  # (h*N, T_q, T_k)
+        key_masks = torch.sign(torch.abs(keys.sum(dim=-1)))  # (N, T_k)
+        key_masks = key_masks.repeat(self.num_heads, 1)  # (h*N, T_k)
+        key_masks = key_masks.unsqueeze(1).repeat(1, queries.size(1), 1)  # (h*N, T_q, T_k)
 
-        paddings = tf.ones_like(outputs) * (-(2**32) + 1)
-        # outputs, (h*N, T_q, T_k)
-        outputs = tf.where(tf.equal(key_masks, 0), paddings, outputs)
+        paddings = torch.ones_like(outputs) * (-(2**32) + 1)
+        outputs = torch.where(key_masks == 0, paddings, outputs)
 
         # Future blinding (Causality)
-        diag_vals = tf.ones_like(outputs[0, :, :])  # (T_q, T_k)
-        tril = tf.linalg.LinearOperatorLowerTriangular(
-            diag_vals
-        ).to_dense()  # (T_q, T_k)
-        masks = tf.tile(
-            tf.expand_dims(tril, 0), [tf.shape(outputs)[0], 1, 1]
-        )  # (h*N, T_q, T_k)
+        diag_vals = torch.ones_like(outputs[0, :, :])  # (T_q, T_k)
+        tril = torch.tril(diag_vals)  # (T_q, T_k)
+        masks = tril.unsqueeze(0).repeat(outputs.size(0), 1, 1)  # (h*N, T_q, T_k)
 
-        paddings = tf.ones_like(masks) * (-(2**32) + 1)
-        # outputs, (h*N, T_q, T_k)
-        outputs = tf.where(tf.equal(masks, 0), paddings, outputs)
+        paddings = torch.ones_like(masks) * (-(2**32) + 1)
+        outputs = torch.where(masks == 0, paddings, outputs)
 
         # Activation
-        outputs = tf.nn.softmax(outputs)  # (h*N, T_q, T_k)
+        outputs = F.softmax(outputs, dim=-1)  # (h*N, T_q, T_k)
 
-        # Query Masking, query_masks (N, T_q)
-        query_masks = tf.sign(tf.abs(tf.reduce_sum(queries, axis=-1)))
-        query_masks = tf.tile(query_masks, [self.num_heads, 1])  # (h*N, T_q)
-        query_masks = tf.tile(
-            tf.expand_dims(query_masks, -1), [1, 1, tf.shape(keys)[1]]
-        )  # (h*N, T_q, T_k)
-        outputs *= query_masks  # broadcasting. (N, T_q, C)
+        # Query Masking
+        query_masks = torch.sign(torch.abs(queries.sum(dim=-1)))  # (N, T_q)
+        query_masks = query_masks.repeat(self.num_heads, 1)  # (h*N, T_q)
+        query_masks = query_masks.unsqueeze(-1).repeat(1, 1, keys.size(1))  # (h*N, T_q, T_k)
+        outputs = outputs * query_masks
 
         # Dropouts
         outputs = self.dropout(outputs)
 
         # Weighted sum
-        outputs = tf.matmul(outputs, V_)  # ( h*N, T_q, C/h)
+        outputs = torch.matmul(outputs, V_)  # (h*N, T_q, C/h)
 
         # --- MULTI HEAD ---
         # concat heads
-        outputs = tf.concat(
-            tf.split(outputs, self.num_heads, axis=0), axis=2
-        )  # (N, T_q, C)
+        outputs = torch.cat(torch.split(outputs, outputs.size(0) // self.num_heads, dim=0), dim=2)  # (N, T_q, C)
 
         # Residual connection
-        outputs += queries
+        outputs = outputs + queries
 
         return outputs
 
 
-class PointWiseFeedForward(tf.keras.layers.Layer):
+class PointWiseFeedForward(nn.Module):
     """
     Convolution layers with residual connection
     """
 
-    def __init__(self, conv_dims, dropout_rate):
+    def __init__(self, embedding_dim, conv_dims, dropout_rate):
         """Initialize parameters.
 
         Args:
+            embedding_dim (int): Embedding dimension (input channels).
             conv_dims (list): List of the dimensions of the Feedforward layer.
             dropout_rate (float): Dropout probability.
         """
         super(PointWiseFeedForward, self).__init__()
         self.conv_dims = conv_dims
         self.dropout_rate = dropout_rate
-        self.conv_layer1 = tf.keras.layers.Conv1D(
-            filters=self.conv_dims[0], kernel_size=1, activation="relu", use_bias=True
+        # Conv1d in PyTorch expects (batch, channels, seq_len)
+        self.conv_layer1 = nn.Conv1d(
+            in_channels=embedding_dim,
+            out_channels=self.conv_dims[0],
+            kernel_size=1,
+            bias=True
         )
-        self.conv_layer2 = tf.keras.layers.Conv1D(
-            filters=self.conv_dims[1], kernel_size=1, activation=None, use_bias=True
+        self.conv_layer2 = nn.Conv1d(
+            in_channels=self.conv_dims[0],
+            out_channels=self.conv_dims[1],
+            kernel_size=1,
+            bias=True
         )
-        self.dropout_layer = tf.keras.layers.Dropout(self.dropout_rate)
+        self.dropout_layer = nn.Dropout(self.dropout_rate)
 
-    def call(self, x):
+    def forward(self, x):
         """Model forward pass.
 
         Args:
-            x (tf.Tensor): Input tensor.
+            x (torch.Tensor): Input tensor of shape (batch, seq_len, channels).
 
         Returns:
-            tf.Tensor: Output tensor.
+            torch.Tensor: Output tensor.
         """
+        # Transpose for Conv1d: (batch, seq_len, channels) -> (batch, channels, seq_len)
+        output = x.transpose(1, 2)
 
-        output = self.conv_layer1(x)
+        output = self.conv_layer1(output)
+        output = F.relu(output)
         output = self.dropout_layer(output)
 
         output = self.conv_layer2(output)
         output = self.dropout_layer(output)
 
+        # Transpose back: (batch, channels, seq_len) -> (batch, seq_len, channels)
+        output = output.transpose(1, 2)
+
         # Residual connection
-        output += x
+        output = output + x
 
         return output
 
 
-class EncoderLayer(tf.keras.layers.Layer):
+class EncoderLayer(nn.Module):
     """
     Transformer based encoder layer
-
     """
 
     def __init__(
@@ -195,58 +197,56 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.embedding_dim = embedding_dim
 
         self.mha = MultiHeadAttention(attention_dim, num_heads, dropout_rate)
-        self.ffn = PointWiseFeedForward(conv_dims, dropout_rate)
+        self.ffn = PointWiseFeedForward(embedding_dim, conv_dims, dropout_rate)
 
-        self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
-        self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.layernorm1 = nn.LayerNorm(embedding_dim, eps=1e-6)
+        self.layernorm2 = nn.LayerNorm(embedding_dim, eps=1e-6)
 
-        self.dropout1 = tf.keras.layers.Dropout(dropout_rate)
-        self.dropout2 = tf.keras.layers.Dropout(dropout_rate)
+        self.dropout1 = nn.Dropout(dropout_rate)
+        self.dropout2 = nn.Dropout(dropout_rate)
 
         self.layer_normalization = LayerNormalization(
             self.seq_max_len, self.embedding_dim, 1e-08
         )
 
     def call_(self, x, training, mask):
-        """Model forward pass.
+        """Model forward pass (alternative implementation).
 
         Args:
-            x (tf.Tensor): Input tensor.
-            training (tf.Tensor): Training tensor.
-            mask (tf.Tensor): Mask tensor.
+            x (torch.Tensor): Input tensor.
+            training (bool): Training mode flag.
+            mask (torch.Tensor): Mask tensor.
 
         Returns:
-            tf.Tensor: Output tensor.
+            torch.Tensor: Output tensor.
         """
-
         attn_output = self.mha(queries=self.layer_normalization(x), keys=x)
-        attn_output = self.dropout1(attn_output, training=training)
+        if training:
+            attn_output = self.dropout1(attn_output)
         out1 = self.layernorm1(x + attn_output)
 
         # feed forward network
-        ffn_output = self.ffn(out1)  # (batch_size, input_seq_len, d_model)
-        ffn_output = self.dropout2(ffn_output, training=training)
-        out2 = self.layernorm2(
-            out1 + ffn_output
-        )  # (batch_size, input_seq_len, d_model)
+        ffn_output = self.ffn(out1)
+        if training:
+            ffn_output = self.dropout2(ffn_output)
+        out2 = self.layernorm2(out1 + ffn_output)
 
         # masking
-        out2 *= mask
+        out2 = out2 * mask
 
         return out2
 
-    def call(self, x, training, mask):
+    def forward(self, x, training, mask):
         """Model forward pass.
 
         Args:
-            x (tf.Tensor): Input tensor.
-            training (Boolean): True if in training mode.
-            mask (tf.Tensor): Mask tensor.
+            x (torch.Tensor): Input tensor.
+            training (bool): True if in training mode.
+            mask (torch.Tensor): Mask tensor.
 
         Returns:
-            tf.Tensor: Output tensor.
+            torch.Tensor: Output tensor.
         """
-
         x_norm = self.layer_normalization(x)
         attn_output = self.mha(queries=x_norm, keys=x)
         attn_output = self.ffn(attn_output)
@@ -255,10 +255,9 @@ class EncoderLayer(tf.keras.layers.Layer):
         return out
 
 
-class Encoder(tf.keras.layers.Layer):
+class Encoder(nn.Module):
     """
     Invokes Transformer based encoder with user defined number of layers
-
     """
 
     def __init__(
@@ -286,7 +285,7 @@ class Encoder(tf.keras.layers.Layer):
 
         self.num_layers = num_layers
 
-        self.enc_layers = [
+        self.enc_layers = nn.ModuleList([
             EncoderLayer(
                 seq_max_len,
                 embedding_dim,
@@ -296,29 +295,28 @@ class Encoder(tf.keras.layers.Layer):
                 dropout_rate,
             )
             for _ in range(num_layers)
-        ]
+        ])
 
-        self.dropout = tf.keras.layers.Dropout(dropout_rate)
+        self.dropout = nn.Dropout(dropout_rate)
 
-    def call(self, x, training, mask):
+    def forward(self, x, training, mask):
         """Model forward pass.
 
         Args:
-            x (tf.Tensor): Input tensor.
-            training (Boolean): True if in training mode.
-            mask (tf.Tensor): Mask tensor.
+            x (torch.Tensor): Input tensor.
+            training (bool): True if in training mode.
+            mask (torch.Tensor): Mask tensor.
 
         Returns:
-            tf.Tensor: Output tensor.
+            torch.Tensor: Output tensor.
         """
-
         for i in range(self.num_layers):
             x = self.enc_layers[i](x, training=training, mask=mask)
 
         return x  # (batch_size, input_seq_len, d_model)
 
 
-class LayerNormalization(tf.keras.layers.Layer):
+class LayerNormalization(nn.Module):
     """
     Layer normalization using mean and variance
     gamma and beta are the learnable parameters
@@ -337,33 +335,59 @@ class LayerNormalization(tf.keras.layers.Layer):
         self.embedding_dim = embedding_dim
         self.epsilon = epsilon
         self.params_shape = (self.seq_max_len, self.embedding_dim)
-        g_init = tf.ones_initializer()
-        self.gamma = tf.Variable(
-            initial_value=g_init(shape=self.params_shape, dtype="float32"),
-            trainable=True,
-        )
-        b_init = tf.zeros_initializer()
-        self.beta = tf.Variable(
-            initial_value=b_init(shape=self.params_shape, dtype="float32"),
-            trainable=True,
-        )
+        self.gamma = nn.Parameter(torch.ones(self.params_shape))
+        self.beta = nn.Parameter(torch.zeros(self.params_shape))
 
-    def call(self, x):
+    def forward(self, x):
         """Model forward pass.
 
         Args:
-            x (tf.Tensor): Input tensor.
+            x (torch.Tensor): Input tensor.
 
         Returns:
-            tf.Tensor: Output tensor.
+            torch.Tensor: Output tensor.
         """
-        mean, variance = tf.nn.moments(x, [-1], keepdims=True)
+        mean = x.mean(dim=-1, keepdim=True)
+        variance = x.var(dim=-1, keepdim=True, unbiased=False)
         normalized = (x - mean) / ((variance + self.epsilon) ** 0.5)
         output = self.gamma * normalized + self.beta
         return output
 
 
-class SASREC(tf.keras.Model):
+def pad_sequences(sequences, maxlen, padding='pre', truncating='pre', value=0):
+    """Pads sequences to the same length.
+
+    Replacement for tf.keras.preprocessing.sequence.pad_sequences
+
+    Args:
+        sequences: List of sequences (each sequence is a list of integers).
+        maxlen: Maximum length of all sequences.
+        padding: 'pre' or 'post' - pad either before or after each sequence.
+        truncating: 'pre' or 'post' - remove values from sequences larger than maxlen.
+        value: Padding value.
+
+    Returns:
+        numpy.ndarray: Padded sequences.
+    """
+    result = np.full((len(sequences), maxlen), value, dtype=np.int64)
+
+    for i, seq in enumerate(sequences):
+        if len(seq) == 0:
+            continue
+        if truncating == 'pre':
+            trunc = seq[-maxlen:]
+        else:
+            trunc = seq[:maxlen]
+
+        if padding == 'pre':
+            result[i, -len(trunc):] = trunc
+        else:
+            result[i, :len(trunc)] = trunc
+
+    return result
+
+
+class SASREC(nn.Module):
     """SAS Rec model
     Self-Attentive Sequential Recommendation Using Transformer
 
@@ -405,22 +429,17 @@ class SASREC(tf.keras.Model):
         self.l2_reg = kwargs.get("l2_reg", 0.0)
         self.num_neg_test = kwargs.get("num_neg_test", 100)
 
-        self.item_embedding_layer = tf.keras.layers.Embedding(
+        self.item_embedding_layer = nn.Embedding(
             self.item_num + 1,
             self.embedding_dim,
-            name="item_embeddings",
-            mask_zero=True,
-            embeddings_regularizer=tf.keras.regularizers.L2(self.l2_reg),
+            padding_idx=0,
         )
 
-        self.positional_embedding_layer = tf.keras.layers.Embedding(
+        self.positional_embedding_layer = nn.Embedding(
             self.seq_max_len,
             self.embedding_dim,
-            name="positional_embeddings",
-            mask_zero=False,
-            embeddings_regularizer=tf.keras.regularizers.L2(self.l2_reg),
         )
-        self.dropout_layer = tf.keras.layers.Dropout(self.dropout_rate)
+        self.dropout_layer = nn.Dropout(self.dropout_rate)
         self.encoder = Encoder(
             self.num_blocks,
             self.seq_max_len,
@@ -430,7 +449,6 @@ class SASREC(tf.keras.Model):
             self.conv_dims,
             self.dropout_rate,
         )
-        self.mask_layer = tf.keras.layers.Masking(mask_value=0)
         self.layer_normalization = LayerNormalization(
             self.seq_max_len, self.embedding_dim, 1e-08
         )
@@ -439,53 +457,50 @@ class SASREC(tf.keras.Model):
         """Compute the sequence and positional embeddings.
 
         Args:
-            input_seq (tf.Tensor): Input sequence
+            input_seq (torch.Tensor): Input sequence
 
         Returns:
-            tf.Tensor, tf.Tensor:
+            torch.Tensor, torch.Tensor:
             - Sequence embeddings.
             - Positional embeddings.
         """
-
         seq_embeddings = self.item_embedding_layer(input_seq)
-        seq_embeddings = seq_embeddings * (self.embedding_dim**0.5)
+        seq_embeddings = seq_embeddings * (self.embedding_dim ** 0.5)
 
-        # FIXME
-        positional_seq = tf.expand_dims(tf.range(tf.shape(input_seq)[1]), 0)
-        positional_seq = tf.tile(positional_seq, [tf.shape(input_seq)[0], 1])
+        positional_seq = torch.arange(input_seq.size(1), device=input_seq.device).unsqueeze(0)
+        positional_seq = positional_seq.expand(input_seq.size(0), -1)
         positional_embeddings = self.positional_embedding_layer(positional_seq)
 
         return seq_embeddings, positional_embeddings
 
-    def call(self, x, training):
+    def forward(self, x, training=True):
         """Model forward pass.
 
         Args:
-            x (tf.Tensor): Input tensor.
-            training (tf.Tensor): Training tensor.
+            x (dict): Input dictionary containing 'input_seq', 'positive', 'negative'.
+            training (bool): Training mode flag.
 
         Returns:
-            tf.Tensor, tf.Tensor, tf.Tensor:
+            torch.Tensor, torch.Tensor, torch.Tensor:
             - Logits of the positive examples.
             - Logits of the negative examples.
             - Mask for nonzero targets
         """
-
         input_seq = x["input_seq"]
         pos = x["positive"]
         neg = x["negative"]
 
-        mask = tf.expand_dims(tf.cast(tf.not_equal(input_seq, 0), tf.float32), -1)
+        mask = (input_seq != 0).float().unsqueeze(-1)
         seq_embeddings, positional_embeddings = self.embedding(input_seq)
 
         # add positional embeddings
-        seq_embeddings += positional_embeddings
+        seq_embeddings = seq_embeddings + positional_embeddings
 
         # dropout
         seq_embeddings = self.dropout_layer(seq_embeddings)
 
         # masking
-        seq_embeddings *= mask
+        seq_embeddings = seq_embeddings * mask
 
         # --- ATTENTION BLOCKS ---
         seq_attention = seq_embeddings
@@ -494,34 +509,25 @@ class SASREC(tf.keras.Model):
 
         # --- PREDICTION LAYER ---
         # user's sequence embedding
-        pos = self.mask_layer(pos)
-        neg = self.mask_layer(neg)
+        pos = pos * (pos != 0).long()  # masking
+        neg = neg * (neg != 0).long()  # masking
 
-        pos = tf.reshape(pos, [tf.shape(input_seq)[0] * self.seq_max_len])
-        neg = tf.reshape(neg, [tf.shape(input_seq)[0] * self.seq_max_len])
+        pos = pos.reshape(input_seq.size(0) * self.seq_max_len)
+        neg = neg.reshape(input_seq.size(0) * self.seq_max_len)
         pos_emb = self.item_embedding_layer(pos)
         neg_emb = self.item_embedding_layer(neg)
-        seq_emb = tf.reshape(
-            seq_attention,
-            [tf.shape(input_seq)[0] * self.seq_max_len, self.embedding_dim],
+        seq_emb = seq_attention.reshape(
+            input_seq.size(0) * self.seq_max_len, self.embedding_dim
         )  # (b*s, d)
 
-        pos_logits = tf.reduce_sum(pos_emb * seq_emb, -1)
-        neg_logits = tf.reduce_sum(neg_emb * seq_emb, -1)
+        pos_logits = (pos_emb * seq_emb).sum(dim=-1)
+        neg_logits = (neg_emb * seq_emb).sum(dim=-1)
 
-        pos_logits = tf.expand_dims(pos_logits, axis=-1)  # (bs, 1)
-        # pos_prob = tf.keras.layers.Dense(1, activation='sigmoid')(pos_logits)  # (bs, 1)
-
-        neg_logits = tf.expand_dims(neg_logits, axis=-1)  # (bs, 1)
-        # neg_prob = tf.keras.layers.Dense(1, activation='sigmoid')(neg_logits)  # (bs, 1)
-
-        # output = tf.concat([pos_logits, neg_logits], axis=0)
+        pos_logits = pos_logits.unsqueeze(-1)  # (bs, 1)
+        neg_logits = neg_logits.unsqueeze(-1)  # (bs, 1)
 
         # masking for loss calculation
-        istarget = tf.reshape(
-            tf.cast(tf.not_equal(pos, 0), dtype=tf.float32),
-            [tf.shape(input_seq)[0] * self.seq_max_len],
-        )
+        istarget = (pos != 0).float()
 
         return pos_logits, neg_logits, istarget
 
@@ -529,38 +535,36 @@ class SASREC(tf.keras.Model):
         """Returns the logits for the test items.
 
         Args:
-            inputs (tf.Tensor): Input tensor.
+            inputs (dict): Input dictionary containing 'input_seq', 'candidate'.
 
         Returns:
-             tf.Tensor: Output tensor.
+            torch.Tensor: Output tensor.
         """
-        training = False
-        input_seq = inputs["input_seq"]
-        candidate = inputs["candidate"]
+        self.eval()
+        with torch.no_grad():
+            input_seq = inputs["input_seq"]
+            candidate = inputs["candidate"]
 
-        mask = tf.expand_dims(tf.cast(tf.not_equal(input_seq, 0), tf.float32), -1)
-        seq_embeddings, positional_embeddings = self.embedding(input_seq)
-        seq_embeddings += positional_embeddings
-        # seq_embeddings = self.dropout_layer(seq_embeddings)
-        seq_embeddings *= mask
-        seq_attention = seq_embeddings
-        seq_attention = self.encoder(seq_attention, training, mask)
-        seq_attention = self.layer_normalization(seq_attention)  # (b, s, d)
-        seq_emb = tf.reshape(
-            seq_attention,
-            [tf.shape(input_seq)[0] * self.seq_max_len, self.embedding_dim],
-        )  # (b*s, d)
-        candidate_emb = self.item_embedding_layer(candidate)  # (b, s, d)
-        candidate_emb = tf.transpose(candidate_emb, perm=[0, 2, 1])  # (b, d, s)
+            mask = (input_seq != 0).float().unsqueeze(-1)
+            seq_embeddings, positional_embeddings = self.embedding(input_seq)
+            seq_embeddings = seq_embeddings + positional_embeddings
+            seq_embeddings = seq_embeddings * mask
+            seq_attention = seq_embeddings
+            seq_attention = self.encoder(seq_attention, training=False, mask=mask)
+            seq_attention = self.layer_normalization(seq_attention)  # (b, s, d)
+            seq_emb = seq_attention.reshape(
+                input_seq.size(0) * self.seq_max_len, self.embedding_dim
+            )  # (b*s, d)
+            candidate_emb = self.item_embedding_layer(candidate)  # (b, s, d)
+            candidate_emb = candidate_emb.transpose(1, 2)  # (b, d, s)
 
-        test_logits = tf.matmul(seq_emb, candidate_emb)
-        # (200, 100) * (1, 101, 100)'
+            test_logits = torch.matmul(seq_emb, candidate_emb)
 
-        test_logits = tf.reshape(
-            test_logits,
-            [tf.shape(input_seq)[0], self.seq_max_len, 1 + self.num_neg_test],
-        )  # (1, 200, 101)
-        test_logits = test_logits[:, -1, :]  # (1, 101)
+            test_logits = test_logits.reshape(
+                input_seq.size(0), self.seq_max_len, 1 + self.num_neg_test
+            )  # (1, 200, 101)
+            test_logits = test_logits[:, -1, :]  # (1, 101)
+
         return test_logits
 
     def loss_function(self, pos_logits, neg_logits, istarget):
@@ -569,38 +573,23 @@ class SASREC(tf.keras.Model):
         take care of the zero items (added for padding).
 
         Args:
-            pos_logits (tf.Tensor): Logits of the positive examples.
-            neg_logits (tf.Tensor): Logits of the negative examples.
-            istarget (tf.Tensor): Mask for nonzero targets.
+            pos_logits (torch.Tensor): Logits of the positive examples.
+            neg_logits (torch.Tensor): Logits of the negative examples.
+            istarget (torch.Tensor): Mask for nonzero targets.
 
         Returns:
-            float: Loss.
+            torch.Tensor: Loss.
         """
-
         pos_logits = pos_logits[:, 0]
         neg_logits = neg_logits[:, 0]
 
         # ignore padding items (0)
-        # istarget = tf.reshape(
-        #     tf.cast(tf.not_equal(self.pos, 0), dtype=tf.float32),
-        #     [tf.shape(self.input_seq)[0] * self.seq_max_len],
-        # )
-        # for logits
-        loss = tf.reduce_sum(
-            -tf.math.log(tf.math.sigmoid(pos_logits) + 1e-24) * istarget
-            - tf.math.log(1 - tf.math.sigmoid(neg_logits) + 1e-24) * istarget
-        ) / tf.reduce_sum(istarget)
+        loss = torch.sum(
+            -torch.log(torch.sigmoid(pos_logits) + 1e-24) * istarget
+            - torch.log(1 - torch.sigmoid(neg_logits) + 1e-24) * istarget
+        ) / torch.sum(istarget)
 
-        # for probabilities
-        # loss = tf.reduce_sum(
-        #         - tf.math.log(pos_logits + 1e-24) * istarget -
-        #         tf.math.log(1 - neg_logits + 1e-24) * istarget
-        # ) / tf.reduce_sum(istarget)
-        reg_loss = tf.compat.v1.losses.get_regularization_loss()
-        # reg_losses = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.REGULARIZATION_LOSSES)
-        # loss += sum(reg_losses)
-        loss += reg_loss
-
+        # L2 regularization is handled by optimizer weight_decay
         return loss
 
     def create_combined_dataset(self, u, seq, pos, neg):
@@ -609,15 +598,9 @@ class SASREC(tf.keras.Model):
         This function is used only during training.
         """
         inputs = {}
-        seq = tf.keras.preprocessing.sequence.pad_sequences(
-            seq, padding="pre", truncating="pre", maxlen=self.seq_max_len
-        )
-        pos = tf.keras.preprocessing.sequence.pad_sequences(
-            pos, padding="pre", truncating="pre", maxlen=self.seq_max_len
-        )
-        neg = tf.keras.preprocessing.sequence.pad_sequences(
-            neg, padding="pre", truncating="pre", maxlen=self.seq_max_len
-        )
+        seq = pad_sequences(seq, padding="pre", truncating="pre", maxlen=self.seq_max_len)
+        pos = pad_sequences(pos, padding="pre", truncating="pre", maxlen=self.seq_max_len)
+        neg = pad_sequences(neg, padding="pre", truncating="pre", maxlen=self.seq_max_len)
 
         inputs["users"] = np.expand_dims(np.array(u), axis=-1)
         inputs["input_seq"] = seq
@@ -634,7 +617,7 @@ class SASREC(tf.keras.Model):
         target = np.expand_dims(target, axis=-1)
         return inputs, target
 
-    def train(self, dataset, sampler, **kwargs):
+    def train_model(self, dataset, sampler, **kwargs):
         """
         High level function for model training as well as
         evaluation on the validation and test dataset
@@ -646,60 +629,51 @@ class SASREC(tf.keras.Model):
 
         num_steps = int(len(dataset.user_train) / batch_size)
 
-        optimizer = tf.keras.optimizers.Adam(
-            learning_rate=lr, beta_1=0.9, beta_2=0.999, epsilon=1e-7
+        # Device setup
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.to(device)
+
+        optimizer = torch.optim.Adam(
+            self.parameters(),
+            lr=lr,
+            betas=(0.9, 0.999),
+            eps=1e-7,
+            weight_decay=self.l2_reg,
         )
-
-        loss_function = self.loss_function
-
-        train_loss = tf.keras.metrics.Mean(name="train_loss")
-
-        train_step_signature = [
-            {
-                "users": tf.TensorSpec(shape=(None, 1), dtype=tf.int64),
-                "input_seq": tf.TensorSpec(
-                    shape=(None, self.seq_max_len), dtype=tf.int64
-                ),
-                "positive": tf.TensorSpec(
-                    shape=(None, self.seq_max_len), dtype=tf.int64
-                ),
-                "negative": tf.TensorSpec(
-                    shape=(None, self.seq_max_len), dtype=tf.int64
-                ),
-            },
-            tf.TensorSpec(shape=(None, 1), dtype=tf.int64),
-        ]
-
-        @tf.function(input_signature=train_step_signature)
-        def train_step(inp, tar):
-            with tf.GradientTape() as tape:
-                pos_logits, neg_logits, loss_mask = self(inp, training=True)
-                loss = loss_function(pos_logits, neg_logits, loss_mask)
-
-            gradients = tape.gradient(loss, self.trainable_variables)
-            optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-
-            train_loss(loss)
-            return loss
 
         T = 0.0
         t0 = Timer()
         t0.start()
 
         for epoch in range(1, num_epochs + 1):
-
             step_loss = []
-            train_loss.reset_state()
+            self.train()  # Set training mode
+
             for step in tqdm(
                 range(num_steps), total=num_steps, ncols=70, leave=False, unit="b"
             ):
-
                 u, seq, pos, neg = sampler.next_batch()
 
                 inputs, target = self.create_combined_dataset(u, seq, pos, neg)
 
-                loss = train_step(inputs, target)
-                step_loss.append(loss)
+                # Convert to tensors and move to device
+                input_seq = torch.LongTensor(inputs["input_seq"]).to(device)
+                positive = torch.LongTensor(inputs["positive"]).to(device)
+                negative = torch.LongTensor(inputs["negative"]).to(device)
+
+                inp = {
+                    "input_seq": input_seq,
+                    "positive": positive,
+                    "negative": negative,
+                }
+
+                optimizer.zero_grad()
+                pos_logits, neg_logits, loss_mask = self(inp, training=True)
+                loss = self.loss_function(pos_logits, neg_logits, loss_mask)
+                loss.backward()
+                optimizer.step()
+
+                step_loss.append(loss.item())
 
             if epoch % val_epoch == 0:
                 t0.stop()
@@ -721,13 +695,31 @@ class SASREC(tf.keras.Model):
 
         return t_test
 
+    # Alias for backward compatibility
+    def train(self, mode=True):
+        """Sets the module in training mode.
+
+        This method is overridden to maintain compatibility with both PyTorch's
+        nn.Module.train() and the original train() method for training the model.
+
+        Args:
+            mode (bool): Whether to set training mode (True) or evaluation mode (False).
+
+        Returns:
+            SASREC: Returns self.
+        """
+        return super().train(mode)
+
     def evaluate(self, dataset):
         """
         Evaluation on the test users (users with at least 3 items)
         """
+        self.eval()
+        device = next(self.parameters()).device
+
         usernum = dataset.usernum
         itemnum = dataset.itemnum
-        train = dataset.user_train  # removing deepcopy
+        train = dataset.user_train
         valid = dataset.user_valid
         test = dataset.user_test
 
@@ -741,7 +733,6 @@ class SASREC(tf.keras.Model):
             users = range(1, usernum + 1)
 
         for u in tqdm(users, ncols=70, leave=False, unit="b"):
-
             if len(train[u]) < 1 or len(test[u]) < 1:
                 continue
 
@@ -765,12 +756,12 @@ class SASREC(tf.keras.Model):
 
             inputs = {}
             inputs["user"] = np.expand_dims(np.array([u]), axis=-1)
-            inputs["input_seq"] = np.array([seq])
-            inputs["candidate"] = np.array([item_idx])
+            inputs["input_seq"] = torch.LongTensor([seq]).to(device)
+            inputs["candidate"] = torch.LongTensor([item_idx]).to(device)
 
             # inverse to get descending sort
             predictions = -1.0 * self.predict(inputs)
-            predictions = np.array(predictions)
+            predictions = predictions.cpu().numpy()
             predictions = predictions[0]
 
             rank = predictions.argsort().argsort()[0]
@@ -787,14 +778,18 @@ class SASREC(tf.keras.Model):
         """
         Evaluation on the validation users
         """
+        self.eval()
+        device = next(self.parameters()).device
+
         usernum = dataset.usernum
         itemnum = dataset.itemnum
-        train = dataset.user_train  # removing deepcopy
+        train = dataset.user_train
         valid = dataset.user_valid
 
         NDCG = 0.0
         valid_user = 0.0
         HT = 0.0
+
         if usernum > 10000:
             users = random.sample(range(1, usernum + 1), 10000)
         else:
@@ -823,12 +818,11 @@ class SASREC(tf.keras.Model):
 
             inputs = {}
             inputs["user"] = np.expand_dims(np.array([u]), axis=-1)
-            inputs["input_seq"] = np.array([seq])
-            inputs["candidate"] = np.array([item_idx])
+            inputs["input_seq"] = torch.LongTensor([seq]).to(device)
+            inputs["candidate"] = torch.LongTensor([item_idx]).to(device)
 
-            # predictions = -model.predict(sess, [u], [seq], item_idx)
             predictions = -1.0 * self.predict(inputs)
-            predictions = np.array(predictions)
+            predictions = predictions.cpu().numpy()
             predictions = predictions[0]
 
             rank = predictions.argsort().argsort()[0]

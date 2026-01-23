@@ -7,6 +7,7 @@ import pytest
 from collections import defaultdict
 
 try:
+    import torch
     from recommenders.models.sasrec.model import SASREC
     from recommenders.models.sasrec.ssept import SSEPT
     from recommenders.models.sasrec.sampler import WarpSampler
@@ -198,6 +199,28 @@ def test_sasrec(model_parameters):
     assert model.encoder is not None
     assert model.item_embedding_layer is not None
 
+    # Test that the model is a PyTorch module
+    assert isinstance(model, torch.nn.Module)
+
+    # Test forward pass with dummy data
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+
+    batch_size = 2
+    seq_len = params["maxlen"]
+    dummy_input = {
+        "input_seq": torch.randint(0, 100, (batch_size, seq_len)).to(device),
+        "positive": torch.randint(0, 100, (batch_size, seq_len)).to(device),
+        "negative": torch.randint(0, 100, (batch_size, seq_len)).to(device),
+    }
+
+    model.train()
+    pos_logits, neg_logits, istarget = model(dummy_input, training=True)
+
+    assert pos_logits.shape == (batch_size * seq_len, 1)
+    assert neg_logits.shape == (batch_size * seq_len, 1)
+    assert istarget.shape == (batch_size * seq_len,)
+
 
 @pytest.mark.gpu
 def test_ssept(model_parameters):
@@ -221,3 +244,26 @@ def test_ssept(model_parameters):
     assert model.encoder is not None
     assert model.item_embedding_layer is not None
     assert model.user_embedding_layer is not None
+
+    # Test that the model is a PyTorch module
+    assert isinstance(model, torch.nn.Module)
+
+    # Test forward pass with dummy data
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+
+    batch_size = 2
+    seq_len = params["maxlen"]
+    dummy_input = {
+        "users": torch.randint(1, 100, (batch_size, 1)).to(device),
+        "input_seq": torch.randint(0, 100, (batch_size, seq_len)).to(device),
+        "positive": torch.randint(0, 100, (batch_size, seq_len)).to(device),
+        "negative": torch.randint(0, 100, (batch_size, seq_len)).to(device),
+    }
+
+    model.train()
+    pos_logits, neg_logits, istarget = model(dummy_input, training=True)
+
+    assert pos_logits.shape == (batch_size * seq_len, 1)
+    assert neg_logits.shape == (batch_size * seq_len, 1)
+    assert istarget.shape == (batch_size * seq_len,)
