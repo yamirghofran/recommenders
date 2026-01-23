@@ -541,9 +541,16 @@ class SASREC(nn.Module):
             torch.Tensor: Output tensor.
         """
         self.eval()
+        device = next(self.parameters()).device
         with torch.no_grad():
             input_seq = inputs["input_seq"]
             candidate = inputs["candidate"]
+
+            # Convert numpy arrays to tensors if necessary
+            if not isinstance(input_seq, torch.Tensor):
+                input_seq = torch.LongTensor(input_seq).to(device)
+            if not isinstance(candidate, torch.Tensor):
+                candidate = torch.LongTensor(candidate).to(device)
 
             mask = (input_seq != 0).float().unsqueeze(-1)
             seq_embeddings, positional_embeddings = self.embedding(input_seq)
