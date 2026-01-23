@@ -233,7 +233,7 @@ def test_split_returns_stats(temp_data_file):
     stats = data.split(valid_size=1, test_size=1, min_interactions=3)
 
     assert stats["num_users"] == 3
-    assert stats["num_items"] == 10  # 5 + 3 + 2 unique items
+    assert stats["num_items"] == 302  # max item ID (items are 101-105, 201-203, 301-302)
     assert stats["users_with_splits"] == 2  # Users 1 and 2
     assert stats["users_train_only"] == 1  # User 3
 
