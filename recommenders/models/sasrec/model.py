@@ -654,16 +654,37 @@ class SASREC(nn.Module):
         target = np.expand_dims(target, axis=-1)
         return inputs, target
 
-    def train_model(self, dataset, sampler, **kwargs):
+    def train_model(
+        self,
+        dataset,
+        sampler,
+        num_epochs=10,
+        batch_size=128,
+        learning_rate=0.001,
+        val_epoch=0,
+        eval_batch_size=256,
+        verbose=True,
+    ):
         """
-        High level function for model training as well as
-        evaluation on the validation and test dataset
-        """
-        num_epochs = kwargs.get("num_epochs", 10)
-        batch_size = kwargs.get("batch_size", 128)
-        lr = kwargs.get("learning_rate", 0.001)
-        val_epoch = kwargs.get("val_epoch", 5)
+        Train the model.
 
+        Args:
+            dataset: The dataset object containing user_train, user_valid, user_test.
+            sampler: WarpSampler instance for generating training batches.
+            num_epochs (int): Number of training epochs. Default: 10.
+            batch_size (int): Training batch size. Default: 128.
+            learning_rate (float): Learning rate for Adam optimizer. Default: 0.001.
+            val_epoch (int): Evaluate on validation set every N epochs.
+                Set to 0 to disable validation during training. Default: 0.
+            eval_batch_size (int): Batch size for evaluation. Default: 256.
+            verbose (bool): Print training progress. Default: True.
+
+        Returns:
+            dict: Training history containing:
+                - 'loss': List of average loss per epoch
+                - 'val_ndcg': List of validation NDCG@10 (if val_epoch > 0)
+                - 'val_hr': List of validation HR@10 (if val_epoch > 0)
+        """
         num_steps = int(len(dataset.user_train) / batch_size)
 
         # Device setup
@@ -672,11 +693,18 @@ class SASREC(nn.Module):
 
         optimizer = torch.optim.Adam(
             self.parameters(),
-            lr=lr,
+            lr=learning_rate,
             betas=(0.9, 0.999),
             eps=1e-7,
             weight_decay=self.l2_reg,
         )
+
+        # Training history
+        history = {
+            "loss": [],
+            "val_ndcg": [],
+            "val_hr": [],
+        }
 
         T = 0.0
         t0 = Timer()
@@ -687,7 +715,9 @@ class SASREC(nn.Module):
             self.train()  # Set training mode
 
             for step in tqdm(
-                range(num_steps), total=num_steps, ncols=70, leave=False, unit="b"
+                range(num_steps), total=num_steps, ncols=70, leave=False, unit="b",
+                desc=f"Epoch {epoch}/{num_epochs}" if verbose else None,
+                disable=not verbose,
             ):
                 u, seq, pos, neg = sampler.next_batch()
 
@@ -707,25 +737,34 @@ class SASREC(nn.Module):
 
                 step_loss.append(loss.item())
 
-            if epoch % val_epoch == 0:
+            # Record average epoch loss
+            avg_loss = np.mean(step_loss)
+            history["loss"].append(avg_loss)
+
+            # Validation evaluation (if enabled)
+            if val_epoch > 0 and epoch % val_epoch == 0:
                 t0.stop()
-                t1 = t0.interval
-                T += t1
-                print("Evaluating...")
-                t_test = self.evaluate(dataset)
-                t_valid = self.evaluate_valid(dataset)
-                print(
-                    f"\nepoch: {epoch}, time: {T}, valid (NDCG@10: {t_valid[0]}, HR@10: {t_valid[1]})"
-                )
-                print(
-                    f"epoch: {epoch}, time: {T},  test (NDCG@10: {t_test[0]}, HR@10: {t_test[1]})"
-                )
+                T += t0.interval
+
+                val_metrics = self.evaluate_valid(dataset, eval_batch_size=eval_batch_size)
+                history["val_ndcg"].append(val_metrics[0])
+                history["val_hr"].append(val_metrics[1])
+
+                if verbose:
+                    print(
+                        f"Epoch {epoch}: loss={avg_loss:.4f}, "
+                        f"val_NDCG@10={val_metrics[0]:.4f}, val_HR@10={val_metrics[1]:.4f}, "
+                        f"time={T:.1f}s"
+                    )
                 t0.start()
+            elif verbose:
+                print(f"Epoch {epoch}: loss={avg_loss:.4f}")
 
-        t_test = self.evaluate(dataset)
-        print(f"\nepoch: {epoch}, test (NDCG@10: {t_test[0]}, HR@10: {t_test[1]})")
+        t0.stop()
+        if verbose:
+            print(f"Training complete. Total time: {T + t0.interval:.1f}s")
 
-        return t_test
+        return history
 
     # Alias for backward compatibility
     def train(self, mode=True):
