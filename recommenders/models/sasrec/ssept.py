@@ -1,9 +1,14 @@
 # Copyright (c) Recommenders contributors.
 # Licensed under the MIT License.
 
+import numpy as np
+from tqdm import tqdm
 import torch
 import torch.nn as nn
+
+from recommenders.utils.timer import Timer
 from recommenders.models.sasrec.model import SASREC, Encoder, LayerNormalization
+from recommenders.models.sasrec.model import pad_sequences
 
 
 class SSEPT(SASREC):
@@ -260,9 +265,6 @@ class SSEPT(SASREC):
         This function is used only during training.
         Overrides parent to include users in the inputs.
         """
-        from recommenders.models.sasrec.model import pad_sequences
-        import numpy as np
-
         inputs = {}
         seq = pad_sequences(seq, padding="pre", truncating="pre", maxlen=self.seq_max_len)
         pos = pad_sequences(pos, padding="pre", truncating="pre", maxlen=self.seq_max_len)
@@ -289,9 +291,6 @@ class SSEPT(SASREC):
         evaluation on the validation and test dataset.
         Overrides parent to include users in the input tensors.
         """
-        from tqdm import tqdm
-        from recommenders.utils.timer import Timer
-
         num_epochs = kwargs.get("num_epochs", 10)
         batch_size = kwargs.get("batch_size", 128)
         lr = kwargs.get("learning_rate", 0.001)
