@@ -58,7 +58,7 @@ jobs:
   execute-tests:
     name: ${{ join(matrix.*, ', ') }}
     needs: get-test-groups
-    runs-on: ${{ contains(matrix.group, 'gpu') && 'ubuntu-gpu' || 'ubuntu-24.04' }}
+    runs-on: ${{ contains(matrix.group, 'gpu') && 'self-hosted-ubuntu-gpu' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     container:
       image: ${{ contains(matrix.group, 'gpu') && 'nvidia/cuda:12.2.2-devel-ubuntu22.04@sha256:5f603101462baa721ff6ddc44af82f6e9ba7cbd92a424c9f9f348e6e9d6d64c3' || 'buildpack-deps:24.04@sha256:40ee16e3f341497dfd8ae089abe47e60447f714389028726a8c21a75ac405be3' }}
