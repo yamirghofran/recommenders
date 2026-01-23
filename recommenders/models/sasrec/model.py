@@ -566,9 +566,11 @@ class SASREC(nn.Module):
 
         Args:
             inputs (dict): Input dictionary containing 'input_seq', 'candidate'.
+                - input_seq: (batch, seq_max_len) tensor of item indices
+                - candidate: (batch, num_candidates) tensor of candidate item indices
 
         Returns:
-            torch.Tensor: Output tensor.
+            torch.Tensor: Output tensor of shape (batch, num_candidates).
         """
         self.eval()
         device = next(self.parameters()).device
@@ -589,18 +591,16 @@ class SASREC(nn.Module):
             seq_attention = seq_embeddings
             seq_attention = self.encoder(seq_attention, training=False, mask=mask)
             seq_attention = self.layer_normalization(seq_attention)  # (b, s, d)
-            seq_emb = seq_attention.reshape(
-                input_seq.size(0) * self.seq_max_len, self.embedding_dim
-            )  # (b*s, d)
-            candidate_emb = self.item_embedding_layer(candidate)  # (b, s, d)
-            candidate_emb = candidate_emb.transpose(1, 2)  # (b, d, s)
 
-            test_logits = torch.matmul(seq_emb, candidate_emb)
+            # Take only the last position embedding for each sequence
+            seq_emb = seq_attention[:, -1, :]  # (b, d)
 
-            test_logits = test_logits.reshape(
-                input_seq.size(0), self.seq_max_len, 1 + self.num_neg_test
-            )  # (1, 200, 101)
-            test_logits = test_logits[:, -1, :]  # (1, 101)
+            # Get candidate embeddings
+            candidate_emb = self.item_embedding_layer(candidate)  # (b, num_cand, d)
+
+            # Compute logits via batched dot product
+            # (b, num_cand, d) * (b, 1, d) -> (b, num_cand, d) -> sum -> (b, num_cand)
+            test_logits = (candidate_emb * seq_emb.unsqueeze(1)).sum(dim=-1)
 
         return test_logits
 
@@ -742,13 +742,14 @@ class SASREC(nn.Module):
         """
         return super().train(mode)
 
-    def evaluate(self, dataset, seed=None):
+    def evaluate(self, dataset, seed=None, eval_batch_size=256):
         """
         Evaluation on the test users (users with at least 3 items)
 
         Args:
             dataset: The dataset object containing user_train, user_valid, user_test.
             seed (int, optional): Random seed for reproducibility. If None, results may vary.
+            eval_batch_size (int): Batch size for evaluation. Default: 256.
 
         Returns:
             tuple: (NDCG@10, Hit@10) metrics.
@@ -762,67 +763,90 @@ class SASREC(nn.Module):
         valid = dataset.user_valid
         test = dataset.user_test
 
-        NDCG = 0.0
-        HT = 0.0
-        valid_user = 0.0
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
 
         if usernum > 10000:
-            if seed is not None:
-                random.seed(seed)
-                np.random.seed(seed)
             users = random.sample(range(1, usernum + 1), 10000)
         else:
-            users = range(1, usernum + 1)
+            users = list(range(1, usernum + 1))
 
-        for u in tqdm(users, ncols=70, leave=False, unit="b"):
-            if len(train[u]) < 1 or len(test[u]) < 1:
-                continue
+        # Filter valid users (those with train and test data)
+        valid_users = [u for u in users if len(train[u]) >= 1 and len(test[u]) >= 1]
 
-            seq = np.zeros([self.seq_max_len], dtype=np.int32)
-            idx = self.seq_max_len - 1
-            seq[idx] = valid[u][0]
-            idx -= 1
-            for i in reversed(train[u]):
-                seq[idx] = i
-                idx -= 1
-                if idx == -1:
-                    break
-            rated = set(train[u])
-            rated.add(0)
-            item_idx = [test[u][0]]
-            for _ in range(self.num_neg_test):
-                t = np.random.randint(1, itemnum + 1)
-                while t in rated:
-                    t = np.random.randint(1, itemnum + 1)
-                item_idx.append(t)
+        NDCG = 0.0
+        HT = 0.0
 
-            inputs = {}
-            inputs["user"] = np.expand_dims(np.array([u]), axis=-1)
-            inputs["input_seq"] = torch.LongTensor([seq]).to(device)
-            inputs["candidate"] = torch.LongTensor([item_idx]).to(device)
+        # Process in batches
+        for batch_start in tqdm(range(0, len(valid_users), eval_batch_size),
+                                ncols=70, leave=False, unit="batch"):
+            batch_users = valid_users[batch_start:batch_start + eval_batch_size]
+            batch_size = len(batch_users)
 
-            # inverse to get descending sort
-            predictions = -1.0 * self.predict(inputs)
-            predictions = predictions.cpu().numpy()
-            predictions = predictions[0]
+            # Pre-allocate arrays for batch
+            seqs = np.zeros((batch_size, self.seq_max_len), dtype=np.int64)
+            candidates = np.zeros((batch_size, 1 + self.num_neg_test), dtype=np.int64)
 
-            rank = predictions.argsort().argsort()[0]
+            for i, u in enumerate(batch_users):
+                # Build sequence: train items + last valid item
+                idx = self.seq_max_len - 1
+                if len(valid[u]) > 0:
+                    seqs[i, idx] = valid[u][0]
+                    idx -= 1
+                for item in reversed(train[u]):
+                    if idx < 0:
+                        break
+                    seqs[i, idx] = item
+                    idx -= 1
 
-            valid_user += 1
+                # Build candidates: test item + negative samples
+                rated = set(train[u])
+                rated.add(0)
+                candidates[i, 0] = test[u][0]
 
-            if rank < 10:
-                NDCG += 1 / np.log2(rank + 2)
-                HT += 1
+                # Vectorized negative sampling
+                neg_samples = []
+                while len(neg_samples) < self.num_neg_test:
+                    samples = np.random.randint(1, itemnum + 1, size=self.num_neg_test * 2)
+                    for s in samples:
+                        if s not in rated:
+                            neg_samples.append(s)
+                            if len(neg_samples) >= self.num_neg_test:
+                                break
+                candidates[i, 1:] = neg_samples[:self.num_neg_test]
 
+            # Convert to tensors and run batch prediction
+            # Include user IDs for SSEPT compatibility (ignored by SASREC.predict)
+            user_ids = np.array(batch_users, dtype=np.int64).reshape(-1, 1)
+            inputs = {
+                "user": torch.LongTensor(user_ids).to(device),
+                "input_seq": torch.LongTensor(seqs).to(device),
+                "candidate": torch.LongTensor(candidates).to(device),
+            }
+
+            with torch.no_grad():
+                predictions = -1.0 * self.predict(inputs)
+                predictions = predictions.cpu().numpy()
+
+            # Compute metrics for batch
+            for i in range(batch_size):
+                rank = predictions[i].argsort().argsort()[0]
+                if rank < 10:
+                    NDCG += 1 / np.log2(rank + 2)
+                    HT += 1
+
+        valid_user = len(valid_users)
         return NDCG / valid_user, HT / valid_user
 
-    def evaluate_valid(self, dataset, seed=None):
+    def evaluate_valid(self, dataset, seed=None, eval_batch_size=256):
         """
         Evaluation on the validation users
 
         Args:
             dataset: The dataset object containing user_train, user_valid.
             seed (int, optional): Random seed for reproducibility. If None, results may vary.
+            eval_batch_size (int): Batch size for evaluation. Default: 256.
 
         Returns:
             tuple: (NDCG@10, Hit@10) metrics.
@@ -835,54 +859,75 @@ class SASREC(nn.Module):
         train = dataset.user_train
         valid = dataset.user_valid
 
-        NDCG = 0.0
-        valid_user = 0.0
-        HT = 0.0
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
 
         if usernum > 10000:
-            if seed is not None:
-                random.seed(seed)
-                np.random.seed(seed)
             users = random.sample(range(1, usernum + 1), 10000)
         else:
-            users = range(1, usernum + 1)
+            users = list(range(1, usernum + 1))
 
-        for u in tqdm(users, ncols=70, leave=False, unit="b"):
-            if len(train[u]) < 1 or len(valid[u]) < 1:
-                continue
+        # Filter valid users (those with train and valid data)
+        valid_users = [u for u in users if len(train[u]) >= 1 and len(valid[u]) >= 1]
 
-            seq = np.zeros([self.seq_max_len], dtype=np.int32)
-            idx = self.seq_max_len - 1
-            for i in reversed(train[u]):
-                seq[idx] = i
-                idx -= 1
-                if idx == -1:
-                    break
+        NDCG = 0.0
+        HT = 0.0
 
-            rated = set(train[u])
-            rated.add(0)
-            item_idx = [valid[u][0]]
-            for _ in range(self.num_neg_test):
-                t = np.random.randint(1, itemnum + 1)
-                while t in rated:
-                    t = np.random.randint(1, itemnum + 1)
-                item_idx.append(t)
+        # Process in batches
+        for batch_start in tqdm(range(0, len(valid_users), eval_batch_size),
+                                ncols=70, leave=False, unit="batch"):
+            batch_users = valid_users[batch_start:batch_start + eval_batch_size]
+            batch_size = len(batch_users)
 
-            inputs = {}
-            inputs["user"] = np.expand_dims(np.array([u]), axis=-1)
-            inputs["input_seq"] = torch.LongTensor([seq]).to(device)
-            inputs["candidate"] = torch.LongTensor([item_idx]).to(device)
+            # Pre-allocate arrays for batch
+            seqs = np.zeros((batch_size, self.seq_max_len), dtype=np.int64)
+            candidates = np.zeros((batch_size, 1 + self.num_neg_test), dtype=np.int64)
 
-            predictions = -1.0 * self.predict(inputs)
-            predictions = predictions.cpu().numpy()
-            predictions = predictions[0]
+            for i, u in enumerate(batch_users):
+                # Build sequence: only train items (no valid item for validation eval)
+                idx = self.seq_max_len - 1
+                for item in reversed(train[u]):
+                    if idx < 0:
+                        break
+                    seqs[i, idx] = item
+                    idx -= 1
 
-            rank = predictions.argsort().argsort()[0]
+                # Build candidates: valid item + negative samples
+                rated = set(train[u])
+                rated.add(0)
+                candidates[i, 0] = valid[u][0]
 
-            valid_user += 1
+                # Vectorized negative sampling
+                neg_samples = []
+                while len(neg_samples) < self.num_neg_test:
+                    samples = np.random.randint(1, itemnum + 1, size=self.num_neg_test * 2)
+                    for s in samples:
+                        if s not in rated:
+                            neg_samples.append(s)
+                            if len(neg_samples) >= self.num_neg_test:
+                                break
+                candidates[i, 1:] = neg_samples[:self.num_neg_test]
 
-            if rank < 10:
-                NDCG += 1 / np.log2(rank + 2)
-                HT += 1
+            # Convert to tensors and run batch prediction
+            # Include user IDs for SSEPT compatibility (ignored by SASREC.predict)
+            user_ids = np.array(batch_users, dtype=np.int64).reshape(-1, 1)
+            inputs = {
+                "user": torch.LongTensor(user_ids).to(device),
+                "input_seq": torch.LongTensor(seqs).to(device),
+                "candidate": torch.LongTensor(candidates).to(device),
+            }
 
+            with torch.no_grad():
+                predictions = -1.0 * self.predict(inputs)
+                predictions = predictions.cpu().numpy()
+
+            # Compute metrics for batch
+            for i in range(batch_size):
+                rank = predictions[i].argsort().argsort()[0]
+                if rank < 10:
+                    NDCG += 1 / np.log2(rank + 2)
+                    HT += 1
+
+        valid_user = len(valid_users)
         return NDCG / valid_user, HT / valid_user

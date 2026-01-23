@@ -174,7 +174,16 @@ class SSEPT(SASREC):
 
     def predict(self, inputs):
         """
-        Model prediction for candidate (negative) items
+        Model prediction for candidate (negative) items.
+
+        Args:
+            inputs (dict): Input dictionary containing 'user', 'input_seq', 'candidate'.
+                - user: (batch, 1) tensor of user indices
+                - input_seq: (batch, seq_max_len) tensor of item indices
+                - candidate: (batch, num_candidates) tensor of candidate item indices
+
+        Returns:
+            torch.Tensor: Output tensor of shape (batch, num_candidates).
         """
         self.eval()
         device = next(self.parameters()).device
@@ -191,44 +200,41 @@ class SSEPT(SASREC):
             if not isinstance(candidate, torch.Tensor):
                 candidate = torch.LongTensor(candidate).to(device)
 
+            num_candidates = candidate.size(1)
+
             mask = (input_seq != 0).float().unsqueeze(-1)
-            seq_embeddings, positional_embeddings = self.embedding(input_seq)  # (1, s, h)
+            seq_embeddings, positional_embeddings = self.embedding(input_seq)  # (b, s, item_dim)
 
-            u0_latent = self.user_embedding_layer(user)
-            u0_latent = u0_latent * (self.user_embedding_dim ** 0.5)  # (1, 1, h)
-            u0_latent = u0_latent.squeeze(0)  # (1, h)
-            test_user_emb = u0_latent.expand(1 + self.num_neg_test, -1)  # (101, h)
+            # User embedding for sequence
+            u_latent = self.user_embedding_layer(user)  # (b, 1, user_dim)
+            u_latent = u_latent * (self.user_embedding_dim ** 0.5)
+            u_latent = u_latent.expand(-1, input_seq.size(1), -1)  # (b, s, user_dim)
 
-            u_latent = self.user_embedding_layer(user)
-            u_latent = u_latent * (self.user_embedding_dim ** 0.5)  # (b, 1, h)
-            u_latent = u_latent.expand(-1, input_seq.size(1), -1)  # (b, s, h)
-
-            seq_embeddings = torch.cat([seq_embeddings, u_latent], dim=2).reshape(
-                input_seq.size(0), -1, self.hidden_units
-            )
-            seq_embeddings = seq_embeddings + positional_embeddings  # (b, s, h1 + h2)
+            # Concatenate item and user embeddings
+            seq_embeddings = torch.cat([seq_embeddings, u_latent], dim=2)  # (b, s, hidden_units)
+            seq_embeddings = seq_embeddings + positional_embeddings  # (b, s, hidden_units)
 
             seq_embeddings = seq_embeddings * mask
-            seq_attention = seq_embeddings
-            seq_attention = self.encoder(seq_attention, training=False, mask=mask)
-            seq_attention = self.layer_normalization(seq_attention)  # (b, s, h1+h2)
-            seq_emb = seq_attention.reshape(
-                input_seq.size(0) * self.seq_max_len, self.hidden_units
-            )  # (b*s1, h1+h2)
+            seq_attention = self.encoder(seq_embeddings, training=False, mask=mask)
+            seq_attention = self.layer_normalization(seq_attention)  # (b, s, hidden_units)
 
-            candidate_emb = self.item_embedding_layer(candidate)  # (b, s2, h2)
-            candidate_emb = candidate_emb.squeeze(0)  # (s2, h2)
-            candidate_emb = torch.cat([candidate_emb, test_user_emb], dim=1).reshape(
-                -1, self.hidden_units
-            )  # (b*s2, h1+h2)
+            # Take only the last position embedding for each sequence
+            seq_emb = seq_attention[:, -1, :]  # (b, hidden_units)
 
-            candidate_emb = candidate_emb.transpose(0, 1)  # (h1+h2, b*s2)
-            test_logits = torch.matmul(seq_emb, candidate_emb)  # (b*s1, b*s2)
+            # Get candidate item embeddings
+            candidate_item_emb = self.item_embedding_layer(candidate)  # (b, num_cand, item_dim)
 
-            test_logits = test_logits.reshape(
-                input_seq.size(0), self.seq_max_len, 1 + self.num_neg_test
-            )  # (1, s, 101)
-            test_logits = test_logits[:, -1, :]  # (1, 101)
+            # User embedding for candidates (same user for all candidates in each batch)
+            user_emb_for_cand = self.user_embedding_layer(user)  # (b, 1, user_dim)
+            user_emb_for_cand = user_emb_for_cand * (self.user_embedding_dim ** 0.5)
+            user_emb_for_cand = user_emb_for_cand.expand(-1, num_candidates, -1)  # (b, num_cand, user_dim)
+
+            # Concatenate item and user embeddings for candidates
+            candidate_emb = torch.cat([candidate_item_emb, user_emb_for_cand], dim=2)  # (b, num_cand, hidden_units)
+
+            # Compute logits via batched dot product
+            # (b, num_cand, hidden_units) * (b, 1, hidden_units) -> (b, num_cand, hidden_units) -> sum -> (b, num_cand)
+            test_logits = (candidate_emb * seq_emb.unsqueeze(1)).sum(dim=-1)
 
         return test_logits
 
