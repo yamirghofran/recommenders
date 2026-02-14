@@ -6,9 +6,9 @@ import pandas as pd
 from cornac.models import BPR as CBPR
 
 from recommenders.utils.constants import (
+    DEFAULT_USER_COL,
     DEFAULT_ITEM_COL,
     DEFAULT_PREDICTION_COL,
-    DEFAULT_USER_COL,
 )
 
 
@@ -98,4 +98,3 @@ class BPR(CBPR):
                 .reset_index(drop=True)
             )
         return all_predictions
-
